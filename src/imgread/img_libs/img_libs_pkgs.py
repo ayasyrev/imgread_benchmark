@@ -1,15 +1,14 @@
-# Image libs installed with pip: Name of lib: name of package
 from importlib.util import find_spec
 
 
 lib_to_package = {
     'PIL': 'pillow',
-    'accimage': 'accimage',  # conda
+    'accimage': 'accimage',  # only conda
     'jpeg4py': 'jpeg4py',
-    'cv2': 'opencv-python-headless',
-    'skimage': 'scikit-image',
-    'imageio': 'imageio',
-    'pyvips': 'pyvips',
+    'cv2': 'opencv-python-headless',  # conda - opencv
+    'skimage': 'scikit-image',  # conda
+    'imageio': 'imageio',  # conda
+    'pyvips': 'pyvips',  # conda
     'torchvision': 'torchvision'}
 
 
