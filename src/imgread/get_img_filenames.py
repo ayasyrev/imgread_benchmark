@@ -1,14 +1,14 @@
 from pathlib import Path
-from typing import List, Optional
+from typing import List, Optional, Union
 
 
 IMG_EXT = [".JPEG", ".JPG", ".jpeg", ".jpg", ".PNG", ".png"]
 
 
 def get_img_filenames(
-    data_dir: str,
+    data_dir: Union[str, Path],
     num_samples: Optional[int] = None,
-    fltr: Optional[str] = None
+    fltr: Optional[str] = None,
 ) -> List[str]:
     """Return list of num_samples image filenames from data_dir.
     If no num_samples, return list of ALL images.
@@ -20,7 +20,7 @@ def get_img_filenames(
 
 
     Returns:
-        List[str]: List of filnames
+        List[str]: List of filenames
     """
     img_filenames = [
         str(fn) for fn in Path(data_dir).rglob("*.*") if fn.suffix in IMG_EXT

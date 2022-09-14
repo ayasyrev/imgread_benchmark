@@ -1,7 +1,7 @@
 import pytest
 from pathlib import Path
 
-from imgread.read_image import read_img_pil, read_img_nparray, read_img
+from imgread.read_img import read_img_pil, read_img_nparray, read_img
 from imgread.img_libs.img_libs_pkgs import lib_to_package, img_lib_available
 
 
