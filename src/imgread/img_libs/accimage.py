@@ -3,14 +3,14 @@ import pkg_resources
 
 import accimage
 
-__version__ = pkg_resources.get_distribution('accimage').version
+__version__ = pkg_resources.get_distribution("accimage").version
 
 
 def read_img(img_path: str) -> accimage.Image:
     return accimage.Image(img_path)
 
 
-def read_img_nparray(img_path: str):
+def read_img_nparray(img_path: str) -> np.ndarray:
     """
     Returns:
         np.ndarray: Image converted to array with shape (width, height, channels)

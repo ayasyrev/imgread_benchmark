@@ -1,4 +1,3 @@
-from pathlib import Path
 import typer
 
 from .version import __version__
@@ -11,7 +10,8 @@ app = typer.Typer()
 @app.command()
 def imgread(
     version: bool = typer.Option(
-        False, "-v", "--version", help="App version and img libs available."),
+        False, "-v", "--version", help="App version and img libs available."
+    ),
 ) -> None:
     print("imgread.")
     if version:

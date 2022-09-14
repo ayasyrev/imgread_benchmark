@@ -5,7 +5,7 @@ import jpeg4py
 from PIL import Image
 
 
-__version__ = pkg_resources.get_distribution('jpeg4py').version
+__version__ = pkg_resources.get_distribution("jpeg4py").version
 
 
 def read_img(img_path: str) -> np.ndarray:

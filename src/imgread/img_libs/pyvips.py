@@ -7,10 +7,11 @@ __version__ = pyvips.__version__
 
 
 def read_img(img_path: str) -> np.ndarray:
-    image = pyvips.Image.new_from_file(img_path, access="sequential")
+    image = pyvips.Image.new_from_file(img_path, access="sequential", memory=True)
 
-    memory_image = image.write_to_memory()
-    numpy_image = np.ndarray(buffer=memory_image, dtype=np.uint8, shape=[image.height, image.width, image.bands])
+    numpy_image = np.ndarray(
+        dtype=np.uint8, shape=[image.height, image.width, image.bands]  # type: ignore
+    )
 
     return numpy_image
 
