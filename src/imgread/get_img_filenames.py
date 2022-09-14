@@ -20,7 +20,7 @@ def get_img_filenames(
 
 
     Returns:
-        List[str]: List of filnames
+        List[str]: List of filenames
     """
     img_filenames = [
         str(fn) for fn in Path(data_dir).rglob("*.*") if fn.suffix in IMG_EXT

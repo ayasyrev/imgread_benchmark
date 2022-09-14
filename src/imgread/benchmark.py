@@ -2,7 +2,7 @@ from typing import Callable, Dict, List, Optional, Union
 
 from benchmark_utils import BenchmarkIter
 
-from .read_image import read_img, read_img_nparray, read_img_pil
+from .read_img import read_img, read_img_nparray, read_img_pil
 from .get_img_filenames import get_img_filenames
 
 

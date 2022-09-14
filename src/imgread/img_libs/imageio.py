@@ -7,7 +7,7 @@ __version__ = imageio.__version__
 
 
 def read_img(img_path: str) -> np.ndarray:
-    return imageio.imread(img_path)
+    return imageio.v2.imread(img_path)
 
 
 def read_img_pil(img_path: str) -> Image.Image:
