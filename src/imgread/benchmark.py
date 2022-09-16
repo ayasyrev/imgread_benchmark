@@ -26,6 +26,7 @@ class BenchmarkImgRead(BenchmarkIter):
         num_repeats: int = 5,
         clear_progress: bool = False,
     ):
+        self.to_format = to_format
         func_to_test = func_dict or read_to_format[to_format]
         img_path = img_path or "."
         if filenames is None:
@@ -36,3 +37,20 @@ class BenchmarkImgRead(BenchmarkIter):
             num_repeats=num_repeats,
             clear_progress=clear_progress,
         )
+
+    def set_func_dict(self, to_format: str) -> None:
+        if to_format not in read_to_format:
+            print(f"{to_format} not in available format.")
+            print("available: ", ", ".join(read_to_format.keys()))
+        else:
+            self.to_format = to_format
+            self.func_dict = read_to_format[to_format]
+
+    @property
+    def func_names(self) -> str:
+        return f"to {self.to_format}: {', '.join(self.func_dict.keys())}"
+    # def __str__(self) -> str:
+    #     return f"{self.__class__.__name__} to {self.to_format} (funcs: {self.func_names})"
+
+    # def __repr__(self) -> str:
+    #     return f"{self.__class__.__name__} to {self.to_format} (funcs: {self.func_names})"
