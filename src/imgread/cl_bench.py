@@ -43,11 +43,9 @@ def benchmark(
 
     bench = BenchmarkImgRead(
         filenames=filenames,
-        img_lib_name=img_lib,
         to_format=to_format,
-        exclude_name=exclude_lib,
     )
-    bench()
+    bench.run(func_name=img_lib, exclude=exclude_lib)
 
 
 if __name__ == "__main__":  # pragma: no cover

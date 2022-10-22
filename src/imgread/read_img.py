@@ -24,7 +24,7 @@ for img_lib in img_lib_available:
 def get_func_dict(func_name: str, img_libs=img_libs):
     return {
         # lib_name: func
-        lib_name: getattr(img_libs[lib_name], func_name, None)  # for colab: python 3.7
+        lib_name: getattr(img_libs[lib_name], func_name)  # for colab: python 3.7
         for lib_name in img_lib_available
         # if (func := getattr(img_libs[lib_name], func_name, None)) is not None
         if getattr(img_libs[lib_name], func_name, None) is not None
