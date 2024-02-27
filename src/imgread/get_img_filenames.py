@@ -1,7 +1,6 @@
 from pathlib import Path
 from typing import List, Optional, Union
 
-
 IMG_EXT = [".JPEG", ".JPG", ".jpeg", ".jpg", ".PNG", ".png"]
 
 

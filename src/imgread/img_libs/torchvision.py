@@ -1,6 +1,6 @@
 import numpy as np
-from torchvision.io import read_image
 from torchvision import __version__  # noqa: F401
+from torchvision.io import read_image
 
 
 def read_img(img_path: str):

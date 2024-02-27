@@ -1,7 +1,6 @@
+import accimage
 import numpy as np
 import pkg_resources
-
-import accimage
 
 __version__ = pkg_resources.get_distribution("accimage").version
 

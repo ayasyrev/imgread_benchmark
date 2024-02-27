@@ -1,9 +1,7 @@
+import jpeg4py
 import numpy as np
 import pkg_resources
-
-import jpeg4py
 from PIL import Image
-
 
 __version__ = pkg_resources.get_distribution("jpeg4py").version
 

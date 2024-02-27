@@ -1,7 +1,6 @@
 import numpy as np
-from PIL import Image
-
 import pyvips
+from PIL import Image
 
 __version__ = pyvips.__version__
 

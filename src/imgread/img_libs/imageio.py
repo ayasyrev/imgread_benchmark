@@ -1,6 +1,5 @@
-import numpy as np
-
 import imageio
+import numpy as np
 from PIL import Image
 
 __version__ = imageio.__version__

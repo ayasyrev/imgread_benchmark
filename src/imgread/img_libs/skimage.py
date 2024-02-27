@@ -1,9 +1,7 @@
-from PIL import Image
 import numpy as np
-
 import skimage
 import skimage.io as io
-
+from PIL import Image
 
 __version__ = skimage.__version__
 

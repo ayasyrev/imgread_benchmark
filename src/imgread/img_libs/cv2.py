@@ -1,6 +1,6 @@
+import cv2
 import numpy as np
 from PIL import Image
-import cv2
 
 __version__ = cv2.__version__
 

@@ -20,10 +20,17 @@ def benchmark(
     all: bool = typer.Option(False, "-A", "--all", help="Use all images from folder"),
     img_lib: str = typer.Option(None, "-l", "--img_lib", help="Image lib to test"),
     exclude_lib: str = typer.Option(
-        None, "-x", "--exclude", help="Image lib exclude from test",
+        None,
+        "-x",
+        "--exclude",
+        help="Image lib exclude from test",
     ),
-    multiprocessing: bool = typer.Option(False, "-m", help="use multiprocessing, default=False"),
-    num_workers: int = typer.Option(None, "--nw", help="num workers, if 0 -> use all cpus"),
+    multiprocessing: bool = typer.Option(
+        False, "-m", help="use multiprocessing, default=False"
+    ),
+    num_workers: int = typer.Option(
+        None, "--nw", help="num workers, if 0 -> use all cpus"
+    ),
 ) -> None:
     """Benchmark read image functions."""
     if not img_path.exists():
@@ -47,7 +54,12 @@ def benchmark(
         filenames=filenames,
         to_format=to_format,
     )
-    bench.run(func_name=img_lib, exclude=exclude_lib, multiprocessing=multiprocessing, num_workers=num_workers)
+    bench.run(
+        func_name=img_lib,
+        exclude=exclude_lib,
+        multiprocessing=multiprocessing,
+        num_workers=num_workers,
+    )
 
 
 if __name__ == "__main__":  # pragma: no cover
