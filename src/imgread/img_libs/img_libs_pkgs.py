@@ -1,6 +1,5 @@
 from importlib.util import find_spec
 
-
 lib_to_package = {
     "PIL": "pillow",
     "accimage": "accimage",  # only conda

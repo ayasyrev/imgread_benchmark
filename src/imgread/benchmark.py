@@ -2,15 +2,16 @@ from typing import Callable, Dict, List, Optional
 
 from benchmark_utils import BenchmarkIter
 
-from .read_img import read_img, read_img_nparray, read_img_pil
 from .get_img_filenames import get_img_filenames
-
+from .read_img import read_img, read_img_ndarray, read_img_pil
 
 read_to_format = {
     "def": read_img,
     "pil": read_img_pil,
-    "np": read_img_nparray,
+    "np": read_img_ndarray,
 }
+
+__all__ = ["BenchmarkImgRead"]
 
 
 class BenchmarkImgRead(BenchmarkIter):
@@ -49,8 +50,3 @@ class BenchmarkImgRead(BenchmarkIter):
     @property
     def func_names(self) -> str:
         return f"to {self.to_format}: {', '.join(self.func_dict.keys())}"
-    # def __str__(self) -> str:
-    #     return f"{self.__class__.__name__} to {self.to_format} (funcs: {self.func_names})"
-
-    # def __repr__(self) -> str:
-    #     return f"{self.__class__.__name__} to {self.to_format} (funcs: {self.func_names})"

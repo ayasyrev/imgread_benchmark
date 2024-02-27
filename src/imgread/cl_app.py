@@ -1,8 +1,7 @@
 import typer
 
-from .version import __version__
 from .read_img import img_libs
-
+from .version import __version__
 
 app = typer.Typer()
 

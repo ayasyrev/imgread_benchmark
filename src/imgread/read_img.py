@@ -21,7 +21,7 @@ for img_lib in img_lib_available:
     img_libs[img_lib] = load_lib(img_lib)
 
 
-def get_func_dict(func_name: str, func_dict: dict) -> dict:
+def get_func_dict(func_name: str, func_dict: dict) -> dict[str, Callable[[str], Any]]:
     """Return dict lib_name: func for given func_name"""
     return {
         lib_name: func
@@ -31,6 +31,10 @@ def get_func_dict(func_name: str, func_dict: dict) -> dict:
 
 
 read_img: Dict[str, Callable[[str], Any]] = get_func_dict("read_img", img_libs)
-read_img_pil: Dict[str, Callable[[str], Image.Image]] = get_func_dict("read_img_pil", img_libs)
-read_img_nparray: Dict[str, Callable[[str], ndarray]] = get_func_dict("read_img_nparray", img_libs)
+read_img_pil: Dict[str, Callable[[str], Image.Image]] = get_func_dict(
+    "read_img_pil", img_libs
+)
+read_img_ndarray: Dict[str, Callable[[str], ndarray]] = get_func_dict(
+    "read_img_ndarray", img_libs
+)
 read_img_version: Dict[str, str] = get_func_dict("__version__", img_libs)

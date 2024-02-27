@@ -1,19 +1,23 @@
+import accimage
 import numpy as np
 import pkg_resources
-
-import accimage
+from PIL import Image
 
 __version__ = pkg_resources.get_distribution("accimage").version
 
+__all__ = ["read_img", "read_img_ndarray", "read_img_pil", "__version__"]
+
 
 def read_img(img_path: str) -> accimage.Image:
+    """Read image from path with accimage. Returns accimage.Image."""
     return accimage.Image(img_path)
 
 
-def read_img_nparray(img_path: str) -> np.ndarray:
+def read_img_ndarray(img_path: str) -> np.ndarray:
     """
+    Reads image from path with accimage and returns numpy array with shape (width, height, channels).
     Returns:
-        np.ndarray: Image converted to array with shape (width, height, channels)
+        np.ndarray: Image as numpy array with shape (width, height, channels)
     """
     image = accimage.Image(img_path)
     image_np = np.empty([image.channels, image.height, image.width], dtype=np.uint8)
@@ -22,4 +26,7 @@ def read_img_nparray(img_path: str) -> np.ndarray:
     return image_np
 
 
-read_img_pil = read_img
+# accimage by default returns PIL.Image compatible accimage.Image, but sometimes you need PIL.Image
+def read_img_pil(img_path: str) -> Image.Image:
+    """Read image from path with accimage and returns PIL.Image."""
+    return Image.fromarray(read_img_ndarray(img_path))
