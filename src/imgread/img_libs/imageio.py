@@ -13,4 +13,4 @@ def read_img_pil(img_path: str) -> Image.Image:
     return Image.fromarray(read_img(img_path))
 
 
-read_img_nparray = read_img
+read_img_ndarray = read_img

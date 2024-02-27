@@ -11,5 +11,5 @@ def read_img(img_path: str) -> Image.Image:
 read_img_pil = read_img
 
 
-def read_img_nparray(img_path: str) -> np.ndarray:
+def read_img_ndarray(img_path: str) -> np.ndarray:
     return np.asarray(read_img(img_path))
