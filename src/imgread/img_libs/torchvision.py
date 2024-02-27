@@ -5,7 +5,6 @@ from PIL import Image
 from torchvision import __version__  # noqa: F401
 from torchvision import io
 
-
 __all__ = [
     "__version__",
     "read_img",

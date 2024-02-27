@@ -8,7 +8,7 @@ from imgread.read_img import read_img, read_img_ndarray, read_img_pil
 if "torchvision" in img_lib_available:  # torchvision test separately
     img_lib_available.pop(-1)  # pragma: no cover
 
-dog = 'tests/test_imgs/dog.jpg'
+dog = "tests/test_imgs/dog.jpg"
 
 
 def test_libs_list():
