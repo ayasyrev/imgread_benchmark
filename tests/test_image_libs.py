@@ -48,3 +48,5 @@ def test_read_img_torchvision():
     img = read_img_ndarray["torchvision"](dog)
     assert img.size == 150528
     assert img.shape == (224, 224, 3)
+    img = read_img_pil["torchvision"](dog)
+    assert img.size == (224, 224)
