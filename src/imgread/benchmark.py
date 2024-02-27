@@ -11,6 +11,8 @@ read_to_format = {
     "np": read_img_ndarray,
 }
 
+__all__ = ["BenchmarkImgRead"]
+
 
 class BenchmarkImgRead(BenchmarkIter):
     """Benchmark image read."""
