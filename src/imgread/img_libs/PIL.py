@@ -1,5 +1,5 @@
 import numpy as np
-from PIL import Image, __version__  # noqa F401
+from PIL import Image, __version__
 
 __all__ = ["read_img", "read_img_ndarray", "read_img_pil", "__version__"]
 

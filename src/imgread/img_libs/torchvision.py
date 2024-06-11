@@ -2,7 +2,7 @@ import numpy as np
 import torch
 import torchvision.transforms.v2.functional as F
 from PIL import Image
-from torchvision import __version__  # noqa: F401
+from torchvision import __version__
 from torchvision import io
 
 __all__ = [
@@ -17,7 +17,7 @@ def read_img(img_path: str) -> torch.Tensor:
     """Read image from path with torchvision.io. Returns torch.Tensor.
 
     Returns:
-        torch.Tensor: Image as torch.Tensor
+        torch.Tensor: Image as torch.Tensors
     """
     return io.read_image(img_path)
 

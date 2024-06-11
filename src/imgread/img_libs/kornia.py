@@ -4,7 +4,7 @@ import kornia as K
 import numpy as np
 import torch
 import torchvision.transforms.v2.functional as F
-from kornia import __version__  # noqa: F401
+from kornia import __version__
 from kornia import io
 from PIL import Image
 
