@@ -1,4 +1,5 @@
 benchmark_utils
 numpy
+pillow
 rich
 typer

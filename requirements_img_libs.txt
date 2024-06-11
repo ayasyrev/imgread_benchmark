@@ -3,5 +3,4 @@ jpeg4py
 kornia
 kornia_rs
 opencv-python-headless
-pillow
 scikit-image
