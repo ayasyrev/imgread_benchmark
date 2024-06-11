@@ -3,4 +3,5 @@ jpeg4py
 opencv-python-headless
 scikit-image
 imageio
-pyvips
+kornia
+kornia_rs
