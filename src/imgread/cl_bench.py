@@ -1,4 +1,5 @@
 from pathlib import Path
+from typing import Literal
 
 import typer
 
@@ -14,8 +15,11 @@ def benchmark(
     num_samples: int = typer.Option(
         200, "-n", "--num_samples", help="Number of samples for test, default 200."
     ),
-    to_format: str = typer.Option(
-        "def", "-t", "--to", help="Format for read image to: default, Pil or Numpy."
+    target_format: Literal["def", "pil", "np"] = typer.Option(
+        "def",
+        "-t",
+        "--to",
+        help="Format for read image to: default: 'def', Pil: 'pil', or Numpy: 'np'.",
     ),
     all: bool = typer.Option(False, "-A", "--all", help="Use all images from folder"),
     img_lib: str = typer.Option(None, "-l", "--img_lib", help="Image lib to test"),
@@ -44,7 +48,7 @@ def benchmark(
             f"! Number of files in {img_path}: {len(filenames)} less than num_samples: {num_samples}"
         )
 
-    print(f"Benchmarking with images from {img_path}, convert to: {to_format}")
+    print(f"Benchmarking with images from {img_path}, convert to: {target_format}")
     if num_samples:
         print(f"number of samples: {num_samples}")
     else:
@@ -52,7 +56,7 @@ def benchmark(
 
     bench = BenchmarkImgRead(
         filenames=filenames,
-        to_format=to_format,
+        target_format=target_format,
     )
     bench.run(
         func_name=img_lib,
