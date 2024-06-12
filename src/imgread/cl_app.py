@@ -21,7 +21,7 @@ def imgread(
 ) -> None:
     """Imgread. Helpers utils for check and benchmark libs for read image files."""
     print("Imgread. Helpers utils for check and benchmark libs for read image files.")
-    print(f"Available {len(img_libs)}s image libs:")
+    print(f"Available {len(img_libs)} image libs:")
 
     if cfg.version:
         print(f"version: {__version__}")
