@@ -14,5 +14,5 @@ def test_get_image_filenames():
     filenames = get_img_filenames(test_data_dir, num_samples=0)
     assert len(filenames) == 4
 
-    filenames = get_img_filenames(test_data_dir, fltr=".png")
+    filenames = get_img_filenames(test_data_dir, ext=".png")
     assert len(filenames) == 2
