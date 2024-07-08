@@ -1,5 +1,5 @@
 argparsecfg
 benchmark_utils
-numpy
+numpy<2.0
 pillow
 rich
