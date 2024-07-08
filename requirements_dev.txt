@@ -8,3 +8,4 @@ nbmetaclean
 nox
 pre-commit
 ruff
+torchvision
