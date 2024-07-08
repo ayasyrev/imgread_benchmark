@@ -1,6 +1,8 @@
 # pyright: reportMissingImports=false
 # pyright: reportMissingModuleSource=false
+from __future__ import annotations
 import importlib
+
 from typing import Any, Callable, Dict
 
 from numpy import ndarray

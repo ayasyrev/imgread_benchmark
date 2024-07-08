@@ -14,7 +14,10 @@ def read_img(img_path: str) -> np.ndarray:
     Returns:
         np.ndarray: Image as numpy array with shape (width, height, channels)
     """
-    return io.imread(img_path, plugin="matplotlib")
+    return io.imread(
+        img_path,
+        # plugin="matplotlib",
+    )
 
 
 def read_img_pil(img_path: str) -> Image.Image:
