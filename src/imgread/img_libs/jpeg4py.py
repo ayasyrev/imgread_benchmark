@@ -1,9 +1,10 @@
 import jpeg4py
 import numpy as np
-import pkg_resources
+
+from importlib.metadata import version
 from PIL import Image
 
-__version__ = pkg_resources.get_distribution("jpeg4py").version
+__version__ = version("jpeg4py")
 
 __all__ = ["read_img", "read_img_ndarray", "read_img_pil", "__version__"]
 
