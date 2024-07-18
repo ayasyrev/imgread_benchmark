@@ -4,11 +4,12 @@ from __future__ import annotations
 import importlib
 
 from typing import Any, Callable, Dict
+from importlib.metadata import version as pkg_version
 
 from numpy import ndarray
 from PIL import Image
 
-from .img_libs.img_libs_pkgs import img_lib_available
+from .img_libs.img_libs_pkgs import img_lib_available, lib_to_package
 
 
 def load_lib(lib_name: str = "pil", module_name: str = "imgread.img_libs") -> Any:
@@ -23,7 +24,7 @@ for img_lib in img_lib_available:
     img_libs[img_lib] = load_lib(img_lib)
 
 
-def get_func_dict(func_name: str, func_dict: dict) -> dict[str, Callable[[str], Any]]:
+def get_func_dict(func_name: str, func_dict: dict[str, Any]) -> dict[str, Callable[[str], Any]]:
     """Return dict lib_name: func for given func_name"""
     return {
         lib_name: func
@@ -39,4 +40,6 @@ read_img_pil: Dict[str, Callable[[str], Image.Image]] = get_func_dict(
 read_img_ndarray: Dict[str, Callable[[str], ndarray]] = get_func_dict(
     "read_img_ndarray", img_libs
 )
-read_img_version: Dict[str, str] = get_func_dict("__version__", img_libs)
+read_img_version: Dict[str, str] = {
+    lib_name: pkg_version(lib_to_package[lib_name]) for lib_name in img_lib_available
+}

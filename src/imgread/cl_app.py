@@ -2,7 +2,7 @@ from argparsecfg import field_argument
 from argparsecfg.app import app
 from dataclasses import dataclass
 
-from .read_img import img_libs
+from .read_img import img_libs, read_img_version
 from .version import __version__
 
 
@@ -28,7 +28,7 @@ def imgread(
     else:
         max_len = max(len(lib_name) for lib_name in img_libs)
         for img_lib in img_libs:
-            print(f"    {img_lib:{max_len}} {img_libs[img_lib].__version__}")
+            print(f"    {img_lib:{max_len}} {read_img_version[img_lib]}")
 
 
 if __name__ == "__main__":  # pragma: no cover
