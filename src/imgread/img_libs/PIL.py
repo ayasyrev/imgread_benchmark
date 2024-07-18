@@ -1,7 +1,7 @@
 import numpy as np
-from PIL import Image, __version__
+from PIL import Image
 
-__all__ = ["read_img", "read_img_ndarray", "read_img_pil", "__version__"]
+__all__ = ["read_img", "read_img_ndarray", "read_img_pil"]
 
 
 def read_img(img_path: str) -> Image.Image:

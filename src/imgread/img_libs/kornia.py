@@ -4,12 +4,10 @@ import kornia as K
 import numpy as np
 import torch
 import torchvision.transforms.v2.functional as F
-from kornia import __version__
 from kornia import io
 from PIL import Image
 
 __all__ = [
-    "__version__",
     "read_img",
     "read_img_ndarray",
     "read_img_pil",

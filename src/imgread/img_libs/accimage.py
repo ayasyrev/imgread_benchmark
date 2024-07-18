@@ -1,12 +1,9 @@
 import accimage
 import numpy as np
 
-from importlib.metadata import version
 from PIL import Image
 
-__version__ = version("accimage")
-
-__all__ = ["read_img", "read_img_ndarray", "read_img_pil", "__version__"]
+__all__ = ["read_img", "read_img_ndarray", "read_img_pil"]
 
 
 def read_img(img_path: str) -> accimage.Image:

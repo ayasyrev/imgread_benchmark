@@ -24,7 +24,9 @@ for img_lib in img_lib_available:
     img_libs[img_lib] = load_lib(img_lib)
 
 
-def get_func_dict(func_name: str, func_dict: dict[str, Any]) -> dict[str, Callable[[str], Any]]:
+def get_func_dict(
+    func_name: str, func_dict: dict[str, Any]
+) -> dict[str, Callable[[str], Any]]:
     """Return dict lib_name: func for given func_name"""
     return {
         lib_name: func

@@ -2,9 +2,7 @@ import numpy as np
 import pyvips
 from PIL import Image
 
-__version__ = pyvips.__version__
-
-__all__ = ["read_img", "read_img_ndarray", "read_img_pil", "__version__"]
+__all__ = ["read_img", "read_img_ndarray", "read_img_pil"]
 
 
 def read_img(img_path: str) -> np.ndarray:
