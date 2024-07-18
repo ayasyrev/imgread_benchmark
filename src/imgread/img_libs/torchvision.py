@@ -2,11 +2,9 @@ import numpy as np
 import torch
 import torchvision.transforms.v2.functional as F
 from PIL import Image
-from torchvision import __version__
 from torchvision import io
 
 __all__ = [
-    "__version__",
     "read_img",
     "read_img_ndarray",
     "read_img_pil",
