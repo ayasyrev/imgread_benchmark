@@ -1,4 +1,5 @@
-typer
-rich
+argparsecfg
 benchmark_utils
 numpy
+pillow
+rich

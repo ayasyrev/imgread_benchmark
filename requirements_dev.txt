@@ -1,0 +1,11 @@
+black
+black[jupyter]
+coverage[toml]
+flake8
+isort
+mypy
+nbmetaclean
+nox
+pre-commit
+ruff
+torchvision

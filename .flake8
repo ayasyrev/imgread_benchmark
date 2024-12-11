@@ -3,9 +3,5 @@ select = C,E,F,W
 max-complexity = 10
 max-line-length = 120
 
-application-import-names = imgread, tests
+application-import-names = imgread_benchmark, tests
 import-order-style = google
-
-per-file-ignores =
-    # imported but unused
-    __init__.py: F401

@@ -1,6 +1,6 @@
-pillow
+imageio
 jpeg4py
+kornia
+kornia_rs
 opencv-python-headless
 scikit-image
-imageio
-pyvips
