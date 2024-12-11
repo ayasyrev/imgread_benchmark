@@ -1,35 +1,83 @@
+from pathlib import Path
+import sys
 from argparsecfg import field_argument
 from argparsecfg.app import app
 from dataclasses import dataclass
-
-from .read_img import img_libs, read_img_version
-from .version import __version__
+from .benchmark import BenchmarkImgRead
+from .get_img_filenames import get_img_filenames
 
 
 @dataclass
 class AppConfig:
-    version: bool = field_argument(
-        "-v", "--version", help="App version.", default=False
+    img_path: str = field_argument(
+        "img_path",  # positional argument
+        help="Directory with images for benchmark",
     )
+    num_samples: int = field_argument(
+        "-n",
+        default=200,
+        help="Number of samples for test, default 200.",
+    )
+    to: str = field_argument(
+        "-t",
+        default="def",
+        help="Format for read image to: default: 'def', Pil: 'pil', or Numpy: 'np'.",
+    )
+    all: bool = field_argument(
+        "-A", default=False, action="store_true", help="Use all images from folder"
+    )
+    img_lib: str = field_argument(
+        "-l", "--img_lib", default=None, help="Image lib to test"
+    )
+    exclude: str = field_argument(
+        "-x",
+        default=None,
+        help="Image lib exclude from test",
+    )
+    multiprocessing: bool = field_argument(
+        "-m",
+        default=False,
+        action="store_true",
+        help="use multiprocessing, default=False",
+    )
+    nw: int = field_argument(default=None, help="num workers, if 0 -> use all cpus")
 
 
 @app(
-    description="Imgread. Helpers utils for check and benchmark libs for read image files.",
+    description="Benchmark read image functions.",
 )
-def imgread(
+def benchmark(
     cfg: AppConfig,
 ) -> None:
-    """Imgread. Helpers utils for check and benchmark libs for read image files."""
-    print("Imgread. Helpers utils for check and benchmark libs for read image files.")
-    print(f"Available {len(img_libs)} image libs:")
+    """Benchmark read image functions."""
+    if not Path(cfg.img_path).exists():
+        print(f"Img dir {cfg.img_path} dos not exist!")
+        raise sys.exit()
+    if cfg.all:
+        cfg.num_samples = 0
+    filenames = get_img_filenames(cfg.img_path, num_samples=cfg.num_samples)
+    if len(filenames) < cfg.num_samples:
+        print(
+            f"! Number of files in {cfg.img_path}: {len(filenames)} less than num_samples: {cfg.num_samples}"
+        )
 
-    if cfg.version:
-        print(f"version: {__version__}")
+    print(f"Benchmarking with images from {cfg.img_path}, target format: {cfg.to}")
+    if cfg.num_samples:
+        print(f"number of samples: {cfg.num_samples}")
     else:
-        max_len = max(len(lib_name) for lib_name in img_libs)
-        for img_lib in img_libs:
-            print(f"    {img_lib:{max_len}} {read_img_version[img_lib]}")
+        print(f"{len(filenames)} images.")
+
+    bench = BenchmarkImgRead(
+        filenames=filenames,
+        target_format=cfg.to,
+    )
+    bench.run(
+        func_name=cfg.img_lib,
+        exclude=cfg.exclude,
+        multiprocessing=cfg.multiprocessing,
+        num_workers=cfg.nw,
+    )
 
 
 if __name__ == "__main__":  # pragma: no cover
-    imgread()
+    benchmark()
