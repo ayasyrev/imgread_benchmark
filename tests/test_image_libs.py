@@ -2,8 +2,8 @@ from pathlib import Path
 
 import pytest
 
-from imgread.img_libs.img_libs_pkgs import img_lib_available, lib_to_package
-from imgread.read_img import read_img, read_img_ndarray, read_img_pil
+from imgread_benchmark.img_libs.img_libs_pkgs import img_lib_available, lib_to_package
+from imgread_benchmark.read_img import read_img, read_img_ndarray, read_img_pil
 
 if "torchvision" in img_lib_available:  # torchvision test separately
     img_lib_available.pop(-1)  # pragma: no cover

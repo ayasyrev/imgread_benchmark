@@ -12,7 +12,7 @@ from PIL import Image
 from .img_libs.img_libs_pkgs import img_lib_available, lib_to_package
 
 
-def load_lib(lib_name: str = "pil", module_name: str = "imgread.img_libs") -> Any:
+def load_lib(lib_name: str = "pil", module_name: str = "imgread_benchmark.img_libs") -> Any:
     """Load image lib."""
     return importlib.import_module(f"{module_name}.{lib_name}")
 

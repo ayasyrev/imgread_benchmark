@@ -1,4 +1,4 @@
-from imgread.get_img_filenames import get_img_filenames
+from imgread_benchmark.get_img_filenames import get_img_filenames
 
 test_data_dir = "tests/test_imgs"
 
