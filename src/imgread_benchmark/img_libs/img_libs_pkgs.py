@@ -7,6 +7,7 @@ lib_to_package = {
     "cv2": "opencv-python-headless",  # conda - opencv
     "skimage": "scikit-image",  # conda
     "imageio": "imageio",  # conda
+    "imread": "imread",  # conda
     "kornia": "kornia",
     # "pyvips": "pyvips",  # conda
     "torchvision": "torchvision",
