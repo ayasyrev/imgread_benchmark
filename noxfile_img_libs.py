@@ -1,9 +1,19 @@
 import nox
 
 
-@nox.session(python=["3.8", "3.9", "3.10", "3.11", "3.12"], venv_backend="uv")
+@nox.session(python=["3.10", "3.11", "3.12", "3.13", "3.14"], venv_backend="uv")
 def conda_tests(session):
     args = session.posargs or ["--cov"]
-    session.install("-e .[test]", "torchvision")
-    session.install("-r", "requirements_img_libs.txt")
+    session.install(
+        "-e .",
+        "pytest",
+        "pytest-cov",
+        "torchvision",
+        "imageio",
+        "jpeg4py",
+        "kornia",
+        "kornia_rs",
+        "opencv-python-headless",
+        "scikit-image",
+    )
     session.run("pytest", *args)
