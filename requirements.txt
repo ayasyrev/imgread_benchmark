@@ -1,5 +1,0 @@
-argparsecfg
-benchmark_utils
-numpy
-pillow
-rich

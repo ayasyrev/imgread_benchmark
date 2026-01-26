@@ -1,0 +1,69 @@
+[build-system]
+requires = ["uv_build>=0.9.25,<0.10.0"]
+build-backend = "uv_build"
+
+[project]
+name = "imgread_benchmark"
+version = "0.3.1.b1"
+description = "benchmark for read images."
+readme = { file = "README.md", content-type = "text/markdown" }
+license = { text = "Apache-2.0" }
+authors = [{ name = "Yasyrev Andrei", email = "a.yasyrev@gmail.com" }]
+requires-python = ">=3.10"
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
+    "License :: OSI Approved :: Apache Software License",
+    "Operating System :: OS Independent",
+]
+dependencies = [
+    "argparsecfg",
+    "benchmark_utils",
+    "numpy",
+    "pillow",
+    "rich",
+]
+
+[project.urls]
+Homepage = "https://github.com/ayasyrev/imgread_benchmark"
+
+[project.scripts]
+imgread_benchmark = "imgread_benchmark.cl_app:benchmark"
+imgread_libs = "imgread_benchmark.cl_versions:imgread_versions"
+
+[dependency-groups]
+dev = [
+    "black",
+    "black[jupyter]",
+    "coverage[toml]",
+    "flake8",
+    "isort",
+    "mypy",
+    "nbmetaclean",
+    "nox",
+    "pre-commit",
+    "ruff",
+    "torchvision",
+]
+test = [
+    "pytest",
+    "pytest-cov",
+]
+img_libs = [
+    "imageio",
+    "jpeg4py",
+    "kornia",
+    "kornia_rs",
+    "opencv-python-headless",
+    "scikit-image",
+]
+
+[tool.imgread.conda-deps]
+packages = [
+    "accimage",
+    "imread",
+]
