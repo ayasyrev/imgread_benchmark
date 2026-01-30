@@ -4,6 +4,7 @@ cov.xml
 .vscode/
 Prj
 Data
+conductor
 AGENTS.md
 GEMINI.md
 # Byte-compiled / optimized / DLL files
