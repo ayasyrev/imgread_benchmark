@@ -69,3 +69,23 @@ class DatasetProvider(abc.ABC):
                 return
             with tarfile.open(archive_path, "r:gz") as tar:
                 tar.extractall(path=self.dataset_dir)
+
+class ImagenetteProvider(DatasetProvider):
+    """Dataset provider for Imagenette."""
+
+    @property
+    def name(self) -> str:
+        return "imagenette"
+
+    @property
+    def default_size(self) -> str:
+        return "full"
+
+    def get_url(self, size: str) -> str:
+        base_url = "https://s3.amazonaws.com/fast-ai-imageclas/imagenette2"
+        if size == "full":
+            return f"{base_url}.tgz"
+        elif size in ["320", "160"]:
+            return f"{base_url}-{size}.tgz"
+        else:
+            raise ValueError(f"Invalid size: {size}. valid sizes are 'full', '320', '160'.")
