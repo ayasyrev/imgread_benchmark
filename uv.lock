@@ -477,6 +477,7 @@ wheels = [
 
 [[package]]
 name = "imgread-benchmark"
+version = "0.3.1b1"
 source = { editable = "." }
 dependencies = [
     { name = "argparsecfg" },
