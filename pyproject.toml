@@ -35,6 +35,7 @@ Homepage = "https://github.com/ayasyrev/imgread_benchmark"
 [project.scripts]
 imgread_benchmark = "imgread_benchmark.cl_app:benchmark"
 imgread_libs = "imgread_benchmark.cl_versions:imgread_versions"
+imgread_data = "imgread_benchmark.cl_data:download_app"
 
 [dependency-groups]
 dev = [
