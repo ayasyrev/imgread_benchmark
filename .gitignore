@@ -7,6 +7,7 @@ Data
 conductor
 AGENTS.md
 GEMINI.md
+.gemini
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
