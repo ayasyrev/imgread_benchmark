@@ -2,7 +2,7 @@ import nox
 
 
 @nox.session(python=["3.10", "3.11", "3.12", "3.13", "3.14"], venv_backend="mamba")
-def conda_tests(session):
+def run_tests(session):
     args = session.posargs or ["--cov"]
     session.conda_install("uv")
     session.run("uv", "pip", "install", "-e .")
