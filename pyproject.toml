@@ -25,6 +25,7 @@ dependencies = [
     "benchmark_utils",
     "numpy",
     "pillow",
+    "requests>=2.32.5",
     "rich",
 ]
 
