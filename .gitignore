@@ -2,6 +2,9 @@
 tmp*/
 cov.xml
 .vscode/
+Prj
+Data
+AGENTS.md
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
