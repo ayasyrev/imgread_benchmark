@@ -23,7 +23,7 @@ def graceful_degradation(func: Callable[[str], Any]) -> Callable[[str], Any]:
     def wrapper(img_path: str, *args, **kwargs) -> Any:
         try:
             return func(img_path, *args, **kwargs)
-        except Exception as e:
+        except (OSError, ValueError) as e:
             console.print(
                 f"[yellow]Warning: Error reading {img_path} with "
                 f"{func.__module__}: {e}[/yellow]"

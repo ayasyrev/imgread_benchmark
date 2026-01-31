@@ -1,6 +1,10 @@
-import pytest
+import io
+import tarfile
 from pathlib import Path
 from unittest.mock import MagicMock, patch
+
+import pytest
+
 from imgread_benchmark.datasets import DatasetProvider
 
 
@@ -54,7 +58,7 @@ def test_dataset_dir_allows_late_name_init(tmp_path):
 def test_dataset_provider_is_abstract():
     """Ensure the base class cannot be instantiated directly."""
     with pytest.raises(TypeError):
-        DatasetProvider(Path("."))
+        DatasetProvider(Path("."))  # type: ignore[abstract]
 
 
 def test_download_skips_if_exists(tmp_path):
@@ -87,3 +91,22 @@ def test_download_executes_if_missing(tmp_path):
     mock_get.assert_called_once()
     mock_extract.assert_called_once()
     assert (provider.dataset_dir / ".ready").exists()
+
+
+def test_extract_blocks_path_traversal(tmp_path):
+    provider = MockDataset(root_dir=tmp_path)
+    archive_path = tmp_path / "malicious.tgz"
+    evil_path = tmp_path / "evil.txt"
+
+    with tarfile.open(archive_path, "w:gz") as tar:
+        member = tarfile.TarInfo(name="../evil.txt")
+        payload = b"owned"
+        member.size = len(payload)
+        tar.addfile(member, io.BytesIO(payload))
+
+    try:
+        with pytest.raises(IOError):
+            provider.extract(archive_path)
+    finally:
+        if evil_path.exists():
+            evil_path.unlink()

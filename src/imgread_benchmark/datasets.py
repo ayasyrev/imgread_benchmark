@@ -82,7 +82,15 @@ class DatasetProvider(abc.ABC):
             if not archive_path.exists():
                 return
             with tarfile.open(archive_path, "r:gz") as tar:
-                tar.extractall(path=self.dataset_dir)
+                members = tar.getmembers()
+                dataset_root = self.dataset_dir.resolve()
+                for member in members:
+                    member_path = (self.dataset_dir / member.name).resolve()
+                    if not member_path.is_relative_to(dataset_root):
+                        raise IOError(
+                            f"Attempted path traversal in tar file: {member.name}"
+                        )
+                tar.extractall(path=self.dataset_dir, members=members)
 
 
 class ImagenetteProvider(DatasetProvider):
