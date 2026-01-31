@@ -1,6 +1,7 @@
 import pytest
 from imgread_benchmark.read_img import read_img
 
+
 def test_graceful_degradation_nonexistent_file():
     # This should not raise an exception if graceful degradation is implemented
     # Currently it will likely raise FileNotFoundError or similar from the underlying libs

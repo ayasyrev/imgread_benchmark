@@ -14,46 +14,33 @@ lib_to_package = {
 }
 
 
-img_lib_available = []
-for lib_name in lib_to_package:
-    if find_spec(lib_name) is not None:
-        if lib_name == "jpeg4py":
-            try:
-                import jpeg4py
-                # Attempt to initialize to check for libjpeg-turbo
-                # Accessing .JPEG requires the lib, but simple import might not trigger it until usage.
-                # However, the previous traceback showed failure during init of JPEG object, which we don't instantiate here.
-                # But let's try a dummy check if possible or just rely on finding the spec.
-                # Actually, the traceback shows failure in _initialize called by JPEG.__init__.
-                # We can try to force initialization if there is a public API for it, or just wrap the usage in tests.
-                # Given the constraints, let's just skip it if it fails to import or fundamental check.
-                pass 
-            except OSError:
-                continue
-        
-        # Determine if we should really exclude it. 
-        # For now, let's keep the find_spec check as primary but add specific exclusion for broken jpeg4py environment.
-        pass
+def _is_jpeg4py_usable() -> bool:
+    try:
+        from jpeg4py import _cffi as jpeg4py_cffi
 
-# Re-implementing the list comprehension with a check
-img_lib_available = [
-    lib_name for lib_name in lib_to_package if find_spec(lib_name) is not None
-]
+        lib = getattr(jpeg4py_cffi, "lib", None)
+        if lib is None:
+            initializer = getattr(jpeg4py_cffi, "_initialize", None)
+            if initializer is not None:
+                backends = getattr(jpeg4py_cffi, "backends", None)
+                if backends is None:
+                    initializer()
+                else:
+                    initializer(backends)
+    except Exception:
+        return False
+    return True
 
-# Quick fix for the broken environment:
-try:
-    import jpeg4py
-    # Trigger the library loading
-    from jpeg4py._cffi import lib
-    if lib is None:
-         # Try to initialize to see if it raises
-        from jpeg4py._cffi import _initialize, backends
-        _initialize(backends)
-except (ImportError, OSError):
-    if "jpeg4py" in img_lib_available:
-        img_lib_available.remove("jpeg4py")
-except Exception:
-    # If anything else goes wrong with jpeg4py, exclude it
-    if "jpeg4py" in img_lib_available:
-        img_lib_available.remove("jpeg4py")
 
+def _build_img_lib_available() -> list[str]:
+    available: list[str] = []
+    for lib_name in lib_to_package:
+        if find_spec(lib_name) is None:
+            continue
+        if lib_name == "jpeg4py" and not _is_jpeg4py_usable():
+            continue
+        available.append(lib_name)
+    return available
+
+
+img_lib_available = _build_img_lib_available()

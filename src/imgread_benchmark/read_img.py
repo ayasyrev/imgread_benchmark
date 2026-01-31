@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import importlib
-import logging
 from functools import wraps
 from importlib.metadata import version as pkg_version
 from typing import Any, Callable, Dict

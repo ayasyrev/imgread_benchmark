@@ -2,15 +2,27 @@ import abc
 import tarfile
 from pathlib import Path
 import requests
-from rich.progress import Progress, SpinnerColumn, TextColumn, BarColumn, DownloadColumn, TransferSpeedColumn
+from rich.progress import (
+    Progress,
+    SpinnerColumn,
+    TextColumn,
+    BarColumn,
+    DownloadColumn,
+    TransferSpeedColumn,
+)
+
 
 class DatasetProvider(abc.ABC):
     """Abstract base class for dataset providers."""
 
     def __init__(self, root_dir: Path | str = ".data"):
         self.root_dir = Path(root_dir)
-        self.dataset_dir = self.root_dir / self.name
-        self.dataset_dir.mkdir(parents=True, exist_ok=True)
+
+    @property
+    def dataset_dir(self) -> Path:
+        path = self.root_dir / self.name
+        path.mkdir(parents=True, exist_ok=True)
+        return path
 
     @property
     @abc.abstractmethod
@@ -38,7 +50,7 @@ class DatasetProvider(abc.ABC):
 
         response = requests.get(url, stream=True)
         response.raise_for_status()
-        total_size = int(response.headers.get('content-length', 0))
+        total_size = int(response.headers.get("content-length", 0))
 
         with Progress(
             SpinnerColumn(),
@@ -47,7 +59,9 @@ class DatasetProvider(abc.ABC):
             DownloadColumn(),
             TransferSpeedColumn(),
         ) as progress:
-            task = progress.add_task(f"Downloading {self.name} ({size})...", total=total_size)
+            task = progress.add_task(
+                f"Downloading {self.name} ({size})...", total=total_size
+            )
             with open(archive_path, "wb") as f:
                 for chunk in response.iter_content(chunk_size=8192):
                     f.write(chunk)
@@ -70,6 +84,7 @@ class DatasetProvider(abc.ABC):
             with tarfile.open(archive_path, "r:gz") as tar:
                 tar.extractall(path=self.dataset_dir)
 
+
 class ImagenetteProvider(DatasetProvider):
     """Dataset provider for Imagenette."""
 
@@ -88,4 +103,6 @@ class ImagenetteProvider(DatasetProvider):
         elif size in ["320", "160"]:
             return f"{base_url}-{size}.tgz"
         else:
-            raise ValueError(f"Invalid size: {size}. valid sizes are 'full', '320', '160'.")
+            raise ValueError(
+                f"Invalid size: {size}. valid sizes are 'full', '320', '160'."
+            )
