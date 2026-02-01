@@ -5,11 +5,11 @@ from PIL import Image
 __all__ = ["read_img", "read_img_ndarray", "read_img_pil"]
 
 
-def read_img(img_path: str) -> np.ndarray:
-    """Read image from path with pyvips and returns numpy array with shape (width, height, channels).
+def read_img(img_path: str) -> pyvips.Image:
+    """Read image from path with pyvips and returns pyvips.Image.
 
     Returns:
-        np.ndarray: Image as numpy array with shape (width, height, channels)
+        pyvips.Image: Image as pyvips.Image
     """
     return pyvips.Image.new_from_file(img_path, access="sequential", memory=True)  # type: ignore
 

@@ -1,4 +1,6 @@
 from importlib.util import find_spec
+from pathlib import Path
+import tempfile
 
 lib_to_package = {
     "PIL": "pillow",
@@ -14,6 +16,45 @@ lib_to_package = {
 }
 
 
-img_lib_available = [
-    lib_name for lib_name in lib_to_package if find_spec(lib_name) is not None
-]
+def _is_jpeg4py_usable() -> bool:
+    try:
+        import jpeg4py
+
+        minimal_jpeg = (
+            b"\xff\xd8\xff\xe0\x00\x10JFIF\x00\x01\x01\x00\x00\x01\x00\x01\x00\x00"
+            b"\xff\xdb\x00\x43\x00\x01\x01\x01\x01\x01\x01\x01\x01\x01\x01\x01\x01"
+            b"\x01\x01\x01\x01\x01\x01\x01\x01\x01\x01\x01\x01\x01\x01\x01\x01\x01"
+            b"\x01\x01\x01\x01\x01\x01\x01\x01\x01\x01\x01\x01\x01\x01\x01\x01\x01"
+            b"\x01\x01\x01\x01\x01\x01\x01\x01\x01\x01\x01\x01\x01\x01\xff\xc0"
+            b'\x00\x11\x08\x00\x01\x00\x01\x03\x01"\x00\x02\x11\x01\x03\x11\x01\xff'
+            b"\xc4\x00\x1f\x00\x00\x01\x05\x01\x01\x01\x01\x01\x01\x00\x00\x00\x00"
+            b"\x00\x00\x00\x00\x01\x02\x03\x04\x05\x06\x07\x08\x09\x0a\x0b\xff\xda\x00"
+            b"\x0c\x03\x01\x00\x02\x11\x03\x11\x00?\x00\xfd\x9f\xff\xd9"
+        )
+
+        tmp_path = None
+        with tempfile.NamedTemporaryFile(suffix=".jpg", delete=False) as tmp_file:
+            tmp_file.write(minimal_jpeg)
+            tmp_path = tmp_file.name
+        try:
+            jpeg4py.JPEG(tmp_path).decode()
+        finally:
+            if tmp_path is not None:
+                Path(tmp_path).unlink(missing_ok=True)
+    except Exception:
+        return False
+    return True
+
+
+def _build_img_lib_available() -> list[str]:
+    available: list[str] = []
+    for lib_name in lib_to_package:
+        if find_spec(lib_name) is None:
+            continue
+        if lib_name == "jpeg4py" and not _is_jpeg4py_usable():
+            continue
+        available.append(lib_name)
+    return available
+
+
+img_lib_available = _build_img_lib_available()
