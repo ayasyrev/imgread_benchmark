@@ -110,3 +110,27 @@ def test_extract_blocks_path_traversal(tmp_path):
     finally:
         if evil_path.exists():
             evil_path.unlink()
+
+
+def test_datasets_without_img_libs(monkeypatch):
+    """Test that dataset providers work without image libraries."""
+    import builtins
+
+    # Block all image library imports
+    original_import = builtins.__import__
+
+    def mock_import(name, *args, **kwargs):
+        if name in ["jpeg4py", "cv2", "skimage", "imageio"]:
+            raise ImportError(f"{name} blocked for test")
+        return original_import(name, *args, **kwargs)
+
+    monkeypatch.setattr(builtins, "__import__", mock_import)
+
+    from imgread_benchmark.datasets import ImagenetteProvider
+
+    provider = ImagenetteProvider()
+    assert provider.name == "imagenette"
+    assert provider.default_size == "full"
+
+    url = provider.get_url("160")
+    assert "imagenette2-160" in url

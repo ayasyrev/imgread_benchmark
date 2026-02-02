@@ -1,6 +1,7 @@
 from importlib.util import find_spec
 from pathlib import Path
 import tempfile
+from functools import lru_cache
 
 lib_to_package = {
     "PIL": "pillow",
@@ -36,14 +37,40 @@ def _is_jpeg4py_usable() -> bool:
         with tempfile.NamedTemporaryFile(suffix=".jpg", delete=False) as tmp_file:
             tmp_file.write(minimal_jpeg)
             tmp_path = tmp_file.name
+
         try:
-            jpeg4py.JPEG(tmp_path).decode()
+            result = jpeg4py.JPEG(tmp_path).decode()
+            del result
+            return True
+        except (AttributeError, OSError, ValueError) as e:
+            error_str = str(e)
+            if "decompressor" in error_str:
+                return False
+            import warnings
+
+            warnings.warn(f"jpeg4py test failed: {e}", RuntimeWarning)
+            return False
         finally:
             if tmp_path is not None:
                 Path(tmp_path).unlink(missing_ok=True)
-    except Exception:
+    except Exception as e:
+        import warnings
+
+        warnings.warn(f"jpeg4py not available: {e}", RuntimeWarning)
         return False
-    return True
+
+
+@lru_cache(maxsize=1)
+def get_img_lib_available() -> list[str]:
+    """Get list of available image libraries (lazy, cached)."""
+    available: list[str] = []
+    for lib_name in lib_to_package:
+        if find_spec(lib_name) is None:
+            continue
+        if lib_name == "jpeg4py" and not _is_jpeg4py_usable():
+            continue
+        available.append(lib_name)
+    return available
 
 
 def _build_img_lib_available() -> list[str]:
@@ -57,4 +84,5 @@ def _build_img_lib_available() -> list[str]:
     return available
 
 
-img_lib_available = _build_img_lib_available()
+# For backwards compatibility - deprecated, use get_img_lib_available()
+img_lib_available = get_img_lib_available()

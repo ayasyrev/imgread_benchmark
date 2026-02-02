@@ -64,3 +64,22 @@ def test_is_jpeg4py_usable_false_on_decode_error(monkeypatch):
     monkeypatch.setitem(sys.modules, "jpeg4py", module)
 
     assert img_libs_pkgs._is_jpeg4py_usable() is False
+
+
+def test_get_img_lib_available():
+    """Test get_img_lib_available function."""
+    from imgread_benchmark.img_libs.img_libs_pkgs import get_img_lib_available
+
+    libs = get_img_lib_available()
+    assert isinstance(libs, list)
+    # PIL should always be available (it's a required dependency)
+    assert "PIL" in libs
+
+
+def test_get_img_lib_available_cached():
+    """Test that get_img_lib_available is cached."""
+    from imgread_benchmark.img_libs.img_libs_pkgs import get_img_lib_available
+
+    libs1 = get_img_lib_available()
+    libs2 = get_img_lib_available()
+    assert libs1 is libs2

@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import importlib
-from functools import wraps
+from functools import lru_cache, wraps
 from importlib.metadata import version as pkg_version
 from typing import Any, Callable, Dict
 
@@ -11,7 +11,7 @@ from numpy import ndarray
 from PIL import Image
 from rich.console import Console
 
-from .img_libs.img_libs_pkgs import img_lib_available, lib_to_package
+from .img_libs.img_libs_pkgs import lib_to_package, get_img_lib_available
 
 console = Console()
 
@@ -40,11 +40,14 @@ def load_lib(
     return importlib.import_module(f"{module_name}.{lib_name}")
 
 
-img_libs = {}
+@lru_cache(maxsize=1)
+def get_img_libs() -> dict:
+    """Get loaded image libraries (lazy, cached)."""
+    return {lib: load_lib(lib) for lib in get_img_lib_available()}
 
 
-for img_lib in img_lib_available:
-    img_libs[img_lib] = load_lib(img_lib)
+# For backwards compatibility
+img_libs = get_img_libs()
 
 
 def get_func_dict(
@@ -53,18 +56,40 @@ def get_func_dict(
     """Return dict lib_name: func for given func_name"""
     return {
         lib_name: graceful_degradation(func)
-        for lib_name in img_lib_available
+        for lib_name in get_img_lib_available()
         if (func := getattr(func_dict[lib_name], func_name, None)) is not None
     }
 
 
-read_img: Dict[str, Callable[[str], Any]] = get_func_dict("read_img", img_libs)
-read_img_pil: Dict[str, Callable[[str], Image.Image]] = get_func_dict(
-    "read_img_pil", img_libs
-)
-read_img_ndarray: Dict[str, Callable[[str], ndarray]] = get_func_dict(
-    "read_img_ndarray", img_libs
-)
-read_img_version: Dict[str, str] = {
-    lib_name: pkg_version(lib_to_package[lib_name]) for lib_name in img_lib_available
-}
+@lru_cache(maxsize=1)
+def get_read_img() -> Dict[str, Callable[[str], Any]]:
+    """Get read_img function dict (lazy, cached)."""
+    return get_func_dict("read_img", get_img_libs())
+
+
+@lru_cache(maxsize=1)
+def get_read_img_pil() -> Dict[str, Callable[[str], Image.Image]]:
+    """Get read_img_pil function dict (lazy, cached)."""
+    return get_func_dict("read_img_pil", get_img_libs())
+
+
+@lru_cache(maxsize=1)
+def get_read_img_ndarray() -> Dict[str, Callable[[str], ndarray]]:
+    """Get read_img_ndarray function dict (lazy, cached)."""
+    return get_func_dict("read_img_ndarray", get_img_libs())
+
+
+@lru_cache(maxsize=1)
+def get_read_img_version() -> Dict[str, str]:
+    """Get version dict for image libraries (lazy, cached)."""
+    return {
+        lib_name: pkg_version(lib_to_package[lib_name])
+        for lib_name in get_img_lib_available()
+    }
+
+
+# For backwards compatibility
+read_img = get_read_img()
+read_img_pil = get_read_img_pil()
+read_img_ndarray = get_read_img_ndarray()
+read_img_version = get_read_img_version()
