@@ -1,3 +1,4 @@
+import collections.abc
 from functools import lru_cache
 from importlib.util import find_spec
 from pathlib import Path
@@ -70,20 +71,12 @@ def _is_jpeg4py_usable() -> bool:
             tmp_file.write(minimal_jpeg)
             tmp_path = tmp_file.name
 
-        jpeg_obj = None
         try:
-            jpeg_obj = jpeg4py.JPEG(tmp_path)
-            result = jpeg_obj.decode()
-            del result
+            jpeg4py.JPEG(tmp_path).decode()
             return True
         except (AttributeError, OSError, ValueError):
             return False
         finally:
-            if jpeg_obj is not None and not hasattr(jpeg_obj, "decompressor"):
-                try:
-                    setattr(jpeg_obj, "decompressor", None)
-                except Exception:
-                    pass
             if tmp_path is not None:
                 Path(tmp_path).unlink(missing_ok=True)
     except Exception:
@@ -115,7 +108,7 @@ def _build_img_lib_available() -> list[str]:
 
 
 # For backwards compatibility - deprecated, use get_img_lib_available()
-class _LazyList:
+class _LazyList(collections.abc.Sequence):
     def __init__(self, factory):
         self._factory = factory
         self._value: list[str] | None = None
@@ -125,17 +118,11 @@ class _LazyList:
             self._value = list(self._factory())
         return self._value
 
-    def __iter__(self):
-        return iter(self._get())
-
     def __len__(self) -> int:
         return len(self._get())
 
     def __getitem__(self, index):
         return self._get()[index]
-
-    def __contains__(self, item) -> bool:
-        return item in self._get()
 
     def __repr__(self) -> str:
         return repr(self._get())

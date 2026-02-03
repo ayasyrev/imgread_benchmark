@@ -5,20 +5,17 @@ import sys
 import types
 
 
-def load_img_libs_pkgs(
-    monkeypatch, find_library_result="libjpeg", jpeg4py_module=None
-):
+def load_img_libs_pkgs(monkeypatch, find_library_result="libjpeg", jpeg4py_module=None):
     import ctypes.util
 
     real_find_spec = importlib.util.find_spec
 
-    monkeypatch.setattr(
-        ctypes.util, "find_library", lambda name: find_library_result
-    )
+    monkeypatch.setattr(ctypes.util, "find_library", lambda name: find_library_result)
     sys.modules.pop("jpeg4py", None)
     sys.modules.pop("jpeg4py._py", None)
     sys.modules.pop("imgread_benchmark.img_libs.img_libs_pkgs", None)
     if jpeg4py_module is not None:
+
         def fake_find_spec(name):
             if name == "jpeg4py":
                 return object()
@@ -69,9 +66,7 @@ def test_is_jpeg4py_usable_true(monkeypatch):
 
     module = types.ModuleType("jpeg4py")
     setattr(module, "JPEG", FakeJPEG)
-    img_libs_pkgs = load_img_libs_pkgs(
-        monkeypatch, jpeg4py_module=module
-    )
+    img_libs_pkgs = load_img_libs_pkgs(monkeypatch, jpeg4py_module=module)
 
     assert img_libs_pkgs._is_jpeg4py_usable() is True
     decode_count[0] = 0
@@ -90,9 +85,7 @@ def test_is_jpeg4py_usable_false_on_decode_error(monkeypatch):
 
     module = types.ModuleType("jpeg4py")
     setattr(module, "JPEG", FakeJPEG)
-    img_libs_pkgs = load_img_libs_pkgs(
-        monkeypatch, jpeg4py_module=module
-    )
+    img_libs_pkgs = load_img_libs_pkgs(monkeypatch, jpeg4py_module=module)
 
     assert img_libs_pkgs._is_jpeg4py_usable() is False
 
@@ -134,3 +127,11 @@ def test_get_img_lib_available_cached():
     libs1 = get_img_lib_available()
     libs2 = get_img_lib_available()
     assert libs1 is libs2
+
+
+def test_lazy_list_is_sequence():
+    import collections.abc
+
+    from imgread_benchmark.img_libs.img_libs_pkgs import img_lib_available
+
+    assert isinstance(img_lib_available, collections.abc.Sequence)

@@ -53,3 +53,15 @@ def test_package_lazy_imports():
     from imgread_benchmark import BenchmarkImgRead
 
     assert BenchmarkImgRead is not None
+
+
+def test_lazy_mapping_is_mapping():
+    import collections.abc
+
+    from imgread_benchmark import read_img as read_img_mod
+
+    assert isinstance(read_img_mod.img_libs, collections.abc.Mapping)
+    assert isinstance(read_img_mod.read_img, collections.abc.Mapping)
+    assert isinstance(read_img_mod.read_img_pil, collections.abc.Mapping)
+    assert isinstance(read_img_mod.read_img_ndarray, collections.abc.Mapping)
+    assert isinstance(read_img_mod.read_img_version, collections.abc.Mapping)

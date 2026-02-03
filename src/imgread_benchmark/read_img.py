@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import importlib
+import collections.abc
 from functools import lru_cache, wraps
 from importlib.metadata import version as pkg_version
 from typing import Any, Callable, Dict
@@ -84,7 +85,7 @@ def get_read_img_version() -> Dict[str, str]:
     }
 
 
-class _LazyMapping:
+class _LazyMapping(collections.abc.Mapping):
     def __init__(self, factory: Callable[[], Dict[str, Any]]):
         self._factory = factory
         self._value: Dict[str, Any] | None = None
@@ -102,21 +103,6 @@ class _LazyMapping:
 
     def __len__(self) -> int:
         return len(self._get())
-
-    def __contains__(self, key: object) -> bool:
-        return key in self._get()
-
-    def get(self, key: str, default: Any = None) -> Any:
-        return self._get().get(key, default)
-
-    def keys(self):
-        return self._get().keys()
-
-    def items(self):
-        return self._get().items()
-
-    def values(self):
-        return self._get().values()
 
     def __repr__(self) -> str:
         return repr(self._get())
