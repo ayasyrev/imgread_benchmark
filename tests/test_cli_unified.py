@@ -49,3 +49,21 @@ def test_cli_data_does_not_import_jpeg4py(monkeypatch):
         mock_provider.download.assert_called_once_with(size="160")
 
     assert not seen["jpeg4py"]
+
+
+def test_cli_libs_prints_versions(monkeypatch, capsys):
+    from imgread_benchmark.cli import main
+
+    monkeypatch.setattr(
+        "imgread_benchmark.img_libs.img_libs_pkgs.get_img_lib_available",
+        lambda: ["PIL", "cv2"],
+    )
+    monkeypatch.setattr(
+        "imgread_benchmark.read_img.get_read_img_version",
+        lambda: {"PIL": "10.0.0", "cv2": "4.10.0"},
+    )
+
+    main(["libs"])
+    out = capsys.readouterr().out
+    assert "PIL" in out and "10.0.0" in out
+    assert "cv2" in out and "4.10.0" in out

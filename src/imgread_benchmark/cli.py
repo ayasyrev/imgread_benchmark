@@ -66,6 +66,25 @@ def _build_cli() -> App:
         provider_cls().download(size=cfg.size)
 
     cli.command(data)
+
+    @dataclass
+    class LibsConfig:
+        pass
+
+    def libs(cfg: LibsConfig) -> None:
+        from .img_libs.img_libs_pkgs import get_img_lib_available
+        from .read_img import get_read_img_version
+
+        names = get_img_lib_available()
+        versions = get_read_img_version()
+        print(f"Available {len(names)} image libs:")
+        if not names:
+            return
+        width = max(len(n) for n in names)
+        for name in names:
+            print(f"    {name:{width}} {versions.get(name, 'unknown')}")
+
+    cli.command(libs)
     return cli
 
 
