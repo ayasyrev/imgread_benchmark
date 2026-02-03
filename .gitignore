@@ -4,6 +4,7 @@ cov.xml
 .vscode/
 Prj
 Data
+.data/
 conductor
 AGENTS.md
 GEMINI.md

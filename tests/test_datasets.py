@@ -62,10 +62,11 @@ def test_dataset_provider_is_abstract():
 
 
 def test_download_skips_if_exists(tmp_path):
-    """Test that download is skipped if the sentinel file exists."""
+    """Test that download is skipped if the sentinel file and expected directory exist."""
     provider = MockDataset(root_dir=tmp_path)
-    # Create a fake sentinel file
+    # Create a fake sentinel file AND expected directory
     (provider.dataset_dir / ".ready").touch()
+    (provider.dataset_dir / "full").mkdir()
 
     with patch("requests.get") as mock_get:
         provider.download("full")
@@ -110,3 +111,27 @@ def test_extract_blocks_path_traversal(tmp_path):
     finally:
         if evil_path.exists():
             evil_path.unlink()
+
+
+def test_datasets_without_img_libs(monkeypatch):
+    """Test that dataset providers work without image libraries."""
+    import builtins
+
+    # Block all image library imports
+    original_import = builtins.__import__
+
+    def mock_import(name, *args, **kwargs):
+        if name in ["jpeg4py", "cv2", "skimage", "imageio"]:
+            raise ImportError(f"{name} blocked for test")
+        return original_import(name, *args, **kwargs)
+
+    monkeypatch.setattr(builtins, "__import__", mock_import)
+
+    from imgread_benchmark.datasets import ImagenetteProvider
+
+    provider = ImagenetteProvider()
+    assert provider.name == "imagenette"
+    assert provider.default_size == "full"
+
+    url = provider.get_url("160")
+    assert "imagenette2-160" in url

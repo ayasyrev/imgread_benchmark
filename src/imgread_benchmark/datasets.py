@@ -2,6 +2,7 @@ import abc
 import tarfile
 from pathlib import Path
 import requests
+from rich.console import Console
 from rich.progress import (
     Progress,
     SpinnerColumn,
@@ -10,6 +11,8 @@ from rich.progress import (
     DownloadColumn,
     TransferSpeedColumn,
 )
+
+console = Console()
 
 
 class DatasetProvider(abc.ABC):
@@ -41,12 +44,23 @@ class DatasetProvider(abc.ABC):
     def download(self, size: str | None = None):
         """Download and extract the dataset."""
         size = size or self.default_size
+        url = self.get_url(size)
+        archive_name = Path(url).name
+        expected_dir = self.dataset_dir / Path(archive_name).stem
+
         sentinel = self.dataset_dir / ".ready"
-        if sentinel.exists():
+        if sentinel.exists() and expected_dir.exists():
+            contents = [
+                p.name for p in self.dataset_dir.iterdir() if p.name != ".ready"
+            ]
+            console.print(
+                f"[green]✓[/green] {self.name} dataset already downloaded ({size})."
+            )
+            if contents:
+                console.print(f"  Available: {', '.join(contents)}")
             return
 
-        url = self.get_url(size)
-        archive_path = self.dataset_dir / Path(url).name
+        archive_path = self.dataset_dir / archive_name
 
         response = requests.get(url, stream=True)
         response.raise_for_status()
@@ -70,6 +84,9 @@ class DatasetProvider(abc.ABC):
         self.extract(archive_path)
         archive_path.unlink(missing_ok=True)  # Remove archive after extraction
         sentinel.touch()
+        console.print(
+            f"[green]✓[/green] {self.name} dataset downloaded successfully ({size})."
+        )
 
     def extract(self, archive_path: Path):
         """Extract the dataset archive."""
