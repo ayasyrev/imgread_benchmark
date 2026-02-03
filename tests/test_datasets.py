@@ -62,10 +62,11 @@ def test_dataset_provider_is_abstract():
 
 
 def test_download_skips_if_exists(tmp_path):
-    """Test that download is skipped if the sentinel file exists."""
+    """Test that download is skipped if the sentinel file and expected directory exist."""
     provider = MockDataset(root_dir=tmp_path)
-    # Create a fake sentinel file
+    # Create a fake sentinel file AND expected directory
     (provider.dataset_dir / ".ready").touch()
+    (provider.dataset_dir / "full").mkdir()
 
     with patch("requests.get") as mock_get:
         provider.download("full")
