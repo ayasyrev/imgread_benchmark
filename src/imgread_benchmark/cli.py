@@ -46,6 +46,26 @@ def _build_cli() -> App:
         _root(cfg, cli)
 
     cli.main(_main_wrapper)
+
+    @dataclass
+    class DataConfig:
+        dataset: str = field_argument("dataset", help="Dataset to download")
+        size: str = field_argument(
+            "--size",
+            default="full",
+            choices=["full", "320", "160"],
+            help="Size of the dataset to download",
+        )
+
+    def data(cfg: DataConfig) -> None:
+        from .cl_data import DATASET_PROVIDERS
+
+        provider_cls = DATASET_PROVIDERS.get(cfg.dataset)
+        if provider_cls is None:
+            raise SystemExit(2)
+        provider_cls().download(size=cfg.size)
+
+    cli.command(data)
     return cli
 
 
