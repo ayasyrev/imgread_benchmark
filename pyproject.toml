@@ -4,7 +4,7 @@ build-backend = "uv_build"
 
 [project]
 name = "imgread_benchmark"
-version = "0.3.1.b1"
+version = "0.3.1b2"
 description = "benchmark for read images."
 readme = { file = "README.md", content-type = "text/markdown" }
 license = { text = "Apache-2.0" }
@@ -33,9 +33,7 @@ dependencies = [
 Homepage = "https://github.com/ayasyrev/imgread_benchmark"
 
 [project.scripts]
-imgread_benchmark = "imgread_benchmark.cl_app:benchmark"
-imgread_libs = "imgread_benchmark.cl_versions:imgread_versions"
-imgread_data = "imgread_benchmark.cl_data:download_app"
+imgread_benchmark = "imgread_benchmark.cli:main"
 
 [project.optional-dependencies]
 dev = [
