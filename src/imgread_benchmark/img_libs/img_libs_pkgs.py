@@ -1,7 +1,8 @@
+from functools import lru_cache
 from importlib.util import find_spec
 from pathlib import Path
 import tempfile
-from functools import lru_cache
+from ctypes.util import find_library
 
 lib_to_package = {
     "PIL": "pillow",
@@ -17,9 +18,40 @@ lib_to_package = {
 }
 
 
+def _has_jpeg_turbo() -> bool:
+    return (
+        find_library("turbojpeg") is not None
+        or find_library("jpeg") is not None
+        or find_library("libjpeg") is not None
+    )
+
+
+def _patch_jpeg4py_del(jpeg4py_module: object) -> None:
+    jpeg_cls = getattr(jpeg4py_module, "JPEG", None)
+    if jpeg_cls is None:
+        return
+    orig_del = getattr(jpeg_cls, "__del__", None)
+    if orig_del is None or getattr(orig_del, "__imgread_safe__", False):
+        return
+
+    def safe_del(self) -> None:
+        try:
+            orig_del(self)
+        except AttributeError:
+            return None
+
+    safe_del.__imgread_safe__ = True
+    setattr(jpeg_cls, "__del__", safe_del)
+
+
 def _is_jpeg4py_usable() -> bool:
     try:
         import jpeg4py
+
+        _patch_jpeg4py_del(jpeg4py)
+
+        if not _has_jpeg_turbo():
+            return False
 
         minimal_jpeg = (
             b"\xff\xd8\xff\xe0\x00\x10JFIF\x00\x01\x01\x00\x00\x01\x00\x01\x00\x00"
@@ -38,25 +70,23 @@ def _is_jpeg4py_usable() -> bool:
             tmp_file.write(minimal_jpeg)
             tmp_path = tmp_file.name
 
+        jpeg_obj = None
         try:
-            result = jpeg4py.JPEG(tmp_path).decode()
+            jpeg_obj = jpeg4py.JPEG(tmp_path)
+            result = jpeg_obj.decode()
             del result
             return True
-        except (AttributeError, OSError, ValueError) as e:
-            error_str = str(e)
-            if "decompressor" in error_str:
-                return False
-            import warnings
-
-            warnings.warn(f"jpeg4py test failed: {e}", RuntimeWarning)
+        except (AttributeError, OSError, ValueError):
             return False
         finally:
+            if jpeg_obj is not None and not hasattr(jpeg_obj, "decompressor"):
+                try:
+                    setattr(jpeg_obj, "decompressor", None)
+                except Exception:
+                    pass
             if tmp_path is not None:
                 Path(tmp_path).unlink(missing_ok=True)
-    except Exception as e:
-        import warnings
-
-        warnings.warn(f"jpeg4py not available: {e}", RuntimeWarning)
+    except Exception:
         return False
 
 
@@ -85,4 +115,33 @@ def _build_img_lib_available() -> list[str]:
 
 
 # For backwards compatibility - deprecated, use get_img_lib_available()
-img_lib_available = get_img_lib_available()
+class _LazyList:
+    def __init__(self, factory):
+        self._factory = factory
+        self._value: list[str] | None = None
+
+    def _get(self) -> list[str]:
+        if self._value is None:
+            self._value = list(self._factory())
+        return self._value
+
+    def __iter__(self):
+        return iter(self._get())
+
+    def __len__(self) -> int:
+        return len(self._get())
+
+    def __getitem__(self, index):
+        return self._get()[index]
+
+    def __contains__(self, item) -> bool:
+        return item in self._get()
+
+    def __repr__(self) -> str:
+        return repr(self._get())
+
+    def __getattr__(self, name: str):
+        return getattr(self._get(), name)
+
+
+img_lib_available = _LazyList(get_img_lib_available)

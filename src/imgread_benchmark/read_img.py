@@ -46,10 +46,6 @@ def get_img_libs() -> dict:
     return {lib: load_lib(lib) for lib in get_img_lib_available()}
 
 
-# For backwards compatibility
-img_libs = get_img_libs()
-
-
 def get_func_dict(
     func_name: str, func_dict: dict[str, Any]
 ) -> dict[str, Callable[[str], Any]]:
@@ -88,8 +84,47 @@ def get_read_img_version() -> Dict[str, str]:
     }
 
 
-# For backwards compatibility
-read_img = get_read_img()
-read_img_pil = get_read_img_pil()
-read_img_ndarray = get_read_img_ndarray()
-read_img_version = get_read_img_version()
+class _LazyMapping:
+    def __init__(self, factory: Callable[[], Dict[str, Any]]):
+        self._factory = factory
+        self._value: Dict[str, Any] | None = None
+
+    def _get(self) -> Dict[str, Any]:
+        if self._value is None:
+            self._value = self._factory()
+        return self._value
+
+    def __getitem__(self, key: str) -> Any:
+        return self._get()[key]
+
+    def __iter__(self):
+        return iter(self._get())
+
+    def __len__(self) -> int:
+        return len(self._get())
+
+    def __contains__(self, key: object) -> bool:
+        return key in self._get()
+
+    def get(self, key: str, default: Any = None) -> Any:
+        return self._get().get(key, default)
+
+    def keys(self):
+        return self._get().keys()
+
+    def items(self):
+        return self._get().items()
+
+    def values(self):
+        return self._get().values()
+
+    def __repr__(self) -> str:
+        return repr(self._get())
+
+
+# For backwards compatibility (lazy)
+img_libs = _LazyMapping(get_img_libs)
+read_img = _LazyMapping(get_read_img)
+read_img_pil = _LazyMapping(get_read_img_pil)
+read_img_ndarray = _LazyMapping(get_read_img_ndarray)
+read_img_version = _LazyMapping(get_read_img_version)
