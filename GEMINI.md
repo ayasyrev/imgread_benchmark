@@ -70,10 +70,11 @@ The core logic resides in `src/imgread_benchmark/benchmark.py`.
 
 - `src/imgread_benchmark/`: Source code.
   - `img_libs/`: Wrappers/adapters for different image libraries (cv2, PIL, etc.).
-  - `cl_app.py`: CLI entry point for benchmarking.
-  - `cl_versions.py`: CLI entry point for listing versions.
-- `tests/`: Pytest suite.
-- `noxfile.py`: Automation definitions for testing.
+  - `cli.py`: Unified CLI entry point with subcommands (benchmark, libs, data).
+  - `cl_app.py`: Legacy benchmark CLI (deprecated, use `cli.py` instead).
+  - `cl_versions.py`: Legacy versions CLI (deprecated, use `cli.py` instead).
+  - `tests/`: Pytest suite.
+  - `noxfile.py`: Automation definitions for testing.
 
 ## Key Configuration Files
 

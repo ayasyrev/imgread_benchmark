@@ -6,16 +6,73 @@ from argparsecfg.app import App
 
 _KNOWN_COMMANDS = {"benchmark", "libs", "data"}
 
+_BENCHMARK_FLAG_ALLOWLIST = {
+    "-n",
+    "-t",
+    "-A",
+    "-l",
+    "--img_lib",
+    "-x",
+    "-m",
+    "--nw",
+}
+
+_ROOT_ONLY_FLAGS = {"-h", "--help", "-V", "--version"}
+
+_FLAGS_WITH_VALUES = {"-n", "-t", "-l", "--img_lib", "-x", "--nw"}
+
 
 def _normalize_argv(argv: Sequence[str]) -> list[str]:
     argv = list(argv)
     if not argv:
         return []
+
     first = argv[0]
+
+    # Known commands pass through unchanged
     if first in _KNOWN_COMMANDS:
         return argv
-    if first.startswith("-"):
+
+    # Root-only flags pass through unchanged
+    if first in _ROOT_ONLY_FLAGS:
         return argv
+
+    # If first arg starts with '-', scan for allowlisted benchmark flags
+    if first.startswith("-"):
+        i = 0
+        saw_allowlist = False
+
+        while i < len(argv) and argv[i].startswith("-"):
+            arg = argv[i]
+
+            # Root-only flag means stop processing
+            if arg in _ROOT_ONLY_FLAGS:
+                return argv
+
+            # Unknown flag means stop processing
+            if arg not in _BENCHMARK_FLAG_ALLOWLIST:
+                return argv
+
+            # Flag is in allowlist
+            saw_allowlist = True
+
+            # If flag takes a value, consume it
+            if arg in _FLAGS_WITH_VALUES:
+                i += 1
+                if i >= len(argv):
+                    # Missing value - return unchanged
+                    return argv
+
+            i += 1
+
+        # If we saw allowlisted flags, inject "benchmark"
+        if saw_allowlist:
+            return ["benchmark", *argv]
+
+        # No allowlisted flags found - return unchanged
+        return argv
+
+    # Positional argument - inject "benchmark"
     return ["benchmark", *argv]
 
 
@@ -59,9 +116,14 @@ def _build_cli() -> App:
 
     def data(cfg: DataConfig) -> None:
         from .cl_data import DATASET_PROVIDERS
+        import sys
 
         provider_cls = DATASET_PROVIDERS.get(cfg.dataset)
         if provider_cls is None:
+            print(
+                f"Error: Unknown dataset '{cfg.dataset}'. Available: {', '.join(DATASET_PROVIDERS)}",
+                file=sys.stderr,
+            )
             raise SystemExit(2)
         provider_cls().download(size=cfg.size)
 
@@ -123,8 +185,8 @@ def _build_cli() -> App:
         from .get_img_filenames import get_img_filenames
 
         if not StdLibPath(cfg.img_path).exists():
-            print(f"Img dir {cfg.img_path} dos not exist!")
-            raise _sys.exit()
+            print(f"Error: Img dir '{cfg.img_path}' does not exist!", file=_sys.stderr)
+            raise SystemExit(1)
         if cfg.all:
             cfg.num_samples = 0
         filenames = get_img_filenames(cfg.img_path, num_samples=cfg.num_samples)
