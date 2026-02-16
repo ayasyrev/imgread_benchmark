@@ -14,6 +14,8 @@ lib_to_package = {
     "imageio": "imageio",  # conda
     "imread": "imread",  # conda
     "kornia": "kornia",
+    "local_rs": "local_rs",
+    "imgread_rs": "imgread-rs",
     # "pyvips": "pyvips",  # conda
     "torchvision": "torchvision",
 }
