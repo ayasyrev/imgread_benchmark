@@ -1,8 +1,8 @@
 from dataclasses import dataclass
 from typing import Sequence, Union
 
-from argparsecfg import field_argument
 from argparsecfg.app import App
+from .argparse_compat import field_argument
 
 _KNOWN_COMMANDS = {"benchmark", "libs", "data"}
 
@@ -162,13 +162,21 @@ def _build_cli() -> App:
             help="Format for read image to: default: 'def', Pil: 'pil', or Numpy: 'np'.",
         )
         all: bool = field_argument(
-            "-A", default=False, action="store_true", help="Use all images from folder"
+            "-A",
+            default=False,
+            action="store_true",
+            help="Use all images from folder",
         )
         img_lib: str = field_argument(
-            "-l", "--img_lib", default=None, help="Image lib to test"
+            "-l",
+            "--img_lib",
+            default=None,
+            help="Image lib to test",
         )
         exclude: str = field_argument(
-            "-x", default=None, help="Image lib exclude from test"
+            "-x",
+            default=None,
+            help="Image lib exclude from test",
         )
         multiprocessing: bool = field_argument(
             "-m",
@@ -176,7 +184,10 @@ def _build_cli() -> App:
             action="store_true",
             help="use multiprocessing, default=False",
         )
-        nw: int = field_argument(default=None, help="num workers, if 0 -> use all cpus")
+        nw: int = field_argument(
+            default=None,
+            help="num workers, if 0 -> use all cpus",
+        )
 
     def benchmark(cfg: BenchmarkConfig) -> None:
         from pathlib import Path as StdLibPath

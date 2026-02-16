@@ -1,7 +1,7 @@
-from argparsecfg import field_argument
 from argparsecfg.app import app
 from dataclasses import dataclass
 
+from .argparse_compat import field_argument
 from .read_img import get_img_libs, get_read_img_version
 from .version import __version__
 
