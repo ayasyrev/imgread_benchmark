@@ -1,4 +1,5 @@
 import collections.abc
+import sys
 from functools import lru_cache
 from importlib.metadata import EntryPoint, entry_points
 from importlib.util import find_spec
@@ -156,7 +157,11 @@ def load_img_lib_adapter(lib_name: str) -> Any:
 def _plugin_is_available(ep: EntryPoint) -> bool:
     try:
         adapter = ep.load()
-    except Exception:
+    except Exception as exc:
+        print(
+            f"Warning: Could not load plugin entry point '{ep.name}': {exc}",
+            file=sys.stderr,
+        )
         return False
     is_available = getattr(adapter, "is_available", None)
     if callable(is_available):
@@ -181,20 +186,6 @@ def get_lib_package_map() -> dict[str, str]:
 @lru_cache(maxsize=1)
 def get_img_lib_available() -> list[str]:
     """Get list of available image libraries (lazy, cached)."""
-    available: list[str] = []
-    for lib_name in _iter_builtin_libs_in_order():
-        if find_spec(lib_name) is None:
-            continue
-        if lib_name == "jpeg4py" and not _is_jpeg4py_usable():
-            continue
-        available.append(lib_name)
-    for lib_name, ep in get_plugin_entry_points().items():
-        if _plugin_is_available(ep):
-            available.append(lib_name)
-    return available
-
-
-def _build_img_lib_available() -> list[str]:
     available: list[str] = []
     for lib_name in _iter_builtin_libs_in_order():
         if find_spec(lib_name) is None:

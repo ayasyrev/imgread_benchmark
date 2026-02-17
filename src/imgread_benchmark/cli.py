@@ -322,7 +322,7 @@ def _build_cli() -> App:
                 multiprocessing=cfg.multiprocessing,
                 num_workers=num_workers,
             )
-        except (PermissionError, RuntimeError) as exc:
+        except (PermissionError, RuntimeError, OSError) as exc:
             if not cfg.multiprocessing:
                 raise
             _print_multiprocessing_start_error(exc)

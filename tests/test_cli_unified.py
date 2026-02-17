@@ -221,3 +221,35 @@ def test_benchmark_multiprocessing_permission_error_is_actionable(
     assert "failed to start multiprocessing workers" in captured.err
     assert "Benchmarking with images from" not in captured.out
     assert not run_called["value"]
+
+
+def test_benchmark_multiprocessing_runtime_oserror_is_actionable(
+    tmp_path, monkeypatch, capsys
+):
+    class DummyBench:
+        def __init__(self, filenames, target_format):
+            self.func_dict = {"PIL": lambda _path: None}
+
+        def run(self, **kwargs):
+            raise OSError("fork not allowed")
+
+    monkeypatch.setattr(
+        "imgread_benchmark.get_img_filenames.get_img_filenames",
+        lambda *_args, **_kwargs: [str(tmp_path / "img.jpg")],
+    )
+    monkeypatch.setattr("imgread_benchmark.benchmark.BenchmarkImgRead", DummyBench)
+    monkeypatch.setattr(
+        "imgread_benchmark.cli._get_multiprocessing_compat_errors",
+        lambda *_args, **_kwargs: [],
+    )
+    monkeypatch.setattr(
+        "imgread_benchmark.cli._probe_multiprocessing_workers",
+        lambda *_args, **_kwargs: None,
+    )
+
+    cli = _build_cli()
+    with pytest.raises(SystemExit) as exc:
+        cli(["benchmark", str(tmp_path), "--multiprocessing"])
+    assert exc.value.code == 2
+    captured = capsys.readouterr()
+    assert "failed to start multiprocessing workers" in captured.err

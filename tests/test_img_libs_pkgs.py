@@ -242,3 +242,31 @@ def test_entry_point_is_available_hook(monkeypatch):
 
     assert "not_ready" in img_libs_pkgs.get_plugin_entry_points()
     assert "not_ready" not in img_libs_pkgs.get_img_lib_available()
+
+
+def test_entry_point_load_error_warns_to_stderr(monkeypatch, capsys):
+    from imgread_benchmark.img_libs import img_libs_pkgs
+
+    class FakeEntryPoint:
+        name = "broken"
+        value = "broken:adapter"
+        module = "broken"
+        dist = None
+
+        def load(self):
+            raise RuntimeError("boom")
+
+    monkeypatch.setattr(img_libs_pkgs, "entry_points", lambda **kwargs: [FakeEntryPoint()])
+    monkeypatch.setattr(img_libs_pkgs, "find_spec", lambda _name: object())
+    monkeypatch.setattr(
+        img_libs_pkgs, "_iter_builtin_libs_in_order", lambda: ("PIL",)
+    )
+
+    img_libs_pkgs.get_plugin_entry_points.cache_clear()
+    img_libs_pkgs.get_lib_package_map.cache_clear()
+    img_libs_pkgs.get_img_lib_available.cache_clear()
+
+    assert "broken" in img_libs_pkgs.get_plugin_entry_points()
+    assert "broken" not in img_libs_pkgs.get_img_lib_available()
+    captured = capsys.readouterr()
+    assert "Could not load plugin entry point 'broken': boom" in captured.err
