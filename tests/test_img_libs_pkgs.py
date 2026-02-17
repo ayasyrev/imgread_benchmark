@@ -129,6 +129,28 @@ def test_get_img_lib_available_cached():
     assert libs1 is libs2
 
 
+def test_additional_backends_are_appended_after_core(monkeypatch):
+    from imgread_benchmark.img_libs import img_libs_pkgs
+
+    def fake_find_spec(name):
+        if name in {"PIL", "local_rs", "imgread_rs"}:
+            return object()
+        return None
+
+    monkeypatch.setattr(img_libs_pkgs, "find_spec", fake_find_spec)
+    monkeypatch.setattr(img_libs_pkgs, "entry_points", lambda **kwargs: [])
+
+    img_libs_pkgs.get_plugin_entry_points.cache_clear()
+    img_libs_pkgs.get_lib_package_map.cache_clear()
+    img_libs_pkgs.get_img_lib_available.cache_clear()
+
+    libs = img_libs_pkgs.get_img_lib_available()
+
+    assert libs[:3] == ["PIL", "local_rs", "imgread_rs"]
+    assert "local_rs" not in img_libs_pkgs._CORE_BUILTIN_LIB_TO_PACKAGE
+    assert "local_rs" in img_libs_pkgs._ADDITIONAL_LIB_TO_PACKAGE
+
+
 def test_lazy_list_is_sequence():
     import collections.abc
 

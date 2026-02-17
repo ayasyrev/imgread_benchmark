@@ -25,38 +25,73 @@ uv run imgread_benchmark data imagenette --size 160
 
 Datasets are stored in the `.data/` directory by default.
 
-## Plugin Backends (No Repo Changes Needed)
+## Add External Backend Plugin (No Repo Code Changes)
 
-`imgread_benchmark` supports external image backends via Python entry points.
-After you install a plugin package into the same environment, it is discovered
-automatically by `imgread_benchmark libs`.
+`imgread_benchmark` discovers external backends via Python entry points.
+You do not need to modify this repository to add your backend.
 
-Entry point group:
+1. Create a plugin package (local or published) with an adapter module.
+2. Expose your backend via entry point group `imgread_benchmark.img_libs`.
+3. Install the plugin package into the same environment as `imgread_benchmark`.
+4. Verify with `imgread_benchmark libs`.
 
-- `imgread_benchmark.img_libs`
+Minimal adapter example (`my_backend_plugin.py`):
 
-Example in plugin package `pyproject.toml`:
+```python
+from PIL import Image
+import numpy as np
 
-```toml
-[project.entry-points."imgread_benchmark.img_libs"]
-imgread_rs = "imgread_rs_plugin:adapter"
+
+def read_img(path: str):
+    return read_img_ndarray(path)
+
+
+def read_img_pil(path: str) -> Image.Image:
+    with Image.open(path) as img:
+        return img.convert("RGB")
+
+
+def read_img_ndarray(path: str) -> np.ndarray:
+    return np.asarray(read_img_pil(path))
+
+
+def is_available() -> bool:
+    return True
 ```
 
-The entry point value should resolve to an adapter object/module that can expose
-any of these callables (partial adapters are allowed):
+Plugin `pyproject.toml`:
 
-- `read_img(path: str)`
-- `read_img_pil(path: str)`
-- `read_img_ndarray(path: str)`
+```toml
+[project]
+name = "my-backend-plugin"
+version = "0.1.0"
+dependencies = ["imgread_benchmark", "pillow", "numpy"]
 
-Optional:
+[project.entry-points."imgread_benchmark.img_libs"]
+my_backend = "my_backend_plugin"
+```
 
-- `is_available() -> bool` for runtime checks (return `False` to hide backend)
+Install plugin into current environment:
+
+```bash
+UV_CACHE_DIR=.uv-cache uv pip install -e /path/to/my-backend-plugin
+```
+
+Verify discovery and run benchmark:
+
+```bash
+UV_CACHE_DIR=.uv-cache uv run imgread_benchmark libs
+UV_CACHE_DIR=.uv-cache uv run imgread_benchmark /path/to/images -l my_backend
+```
 
 Notes:
 
-- If a plugin name conflicts with a built-in backend name, the built-in backend wins.
-- Built-in backends are listed first; plugin backends are appended after discovery.
+- `read_img`, `read_img_pil`, and `read_img_ndarray` are optional individually.
+- For `-t def`, backend should provide `read_img`.
+- For `-t pil`, backend should provide `read_img_pil`.
+- For `-t np`, backend should provide `read_img_ndarray`.
+- If plugin name conflicts with a built-in backend name, built-in backend wins.
+- Built-in backends are listed first; additional and plugin backends are appended.
 
 ## Install Local Rust/PyO3 Backend
 

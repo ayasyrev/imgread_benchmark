@@ -6,7 +6,7 @@ from imgread_benchmark.img_libs.img_libs_pkgs import img_lib_available, lib_to_p
 from imgread_benchmark.read_img import read_img, read_img_ndarray, read_img_pil
 
 if "torchvision" in img_lib_available:  # torchvision test separately
-    img_lib_available.pop(-1)  # pragma: no cover
+    img_lib_available.remove("torchvision")  # pragma: no cover
 
 dog = "tests/test_imgs/dog.jpg"
 

@@ -9,7 +9,7 @@ from typing import Any
 
 ENTRY_POINT_GROUP = "imgread_benchmark.img_libs"
 
-_BUILTIN_LIB_TO_PACKAGE = {
+_CORE_BUILTIN_LIB_TO_PACKAGE = {
     "PIL": "pillow",
     "accimage": "accimage",  # only conda
     "jpeg4py": "jpeg4py",
@@ -18,14 +18,27 @@ _BUILTIN_LIB_TO_PACKAGE = {
     "imageio": "imageio",  # conda
     "imread": "imread",  # conda
     "kornia": "kornia",
-    "local_rs": "local_rs",
-    "imgread_rs": "imgread-rs",
     # "pyvips": "pyvips",  # conda
     "torchvision": "torchvision",
 }
 
+_ADDITIONAL_LIB_TO_PACKAGE = {
+    # Optional non-core backends that should be appended after core built-ins.
+    "local_rs": "local_rs",
+    "imgread_rs": "imgread-rs",
+}
+
+_BUILTIN_LIB_TO_PACKAGE = {
+    **_CORE_BUILTIN_LIB_TO_PACKAGE,
+    **_ADDITIONAL_LIB_TO_PACKAGE,
+}
+
 # Backwards compatibility for code importing this constant directly.
 lib_to_package = dict(_BUILTIN_LIB_TO_PACKAGE)
+
+
+def _iter_builtin_libs_in_order() -> tuple[str, ...]:
+    return (*_CORE_BUILTIN_LIB_TO_PACKAGE, *_ADDITIONAL_LIB_TO_PACKAGE)
 
 
 def _has_jpeg_turbo() -> bool:
@@ -169,7 +182,7 @@ def get_lib_package_map() -> dict[str, str]:
 def get_img_lib_available() -> list[str]:
     """Get list of available image libraries (lazy, cached)."""
     available: list[str] = []
-    for lib_name in _BUILTIN_LIB_TO_PACKAGE:
+    for lib_name in _iter_builtin_libs_in_order():
         if find_spec(lib_name) is None:
             continue
         if lib_name == "jpeg4py" and not _is_jpeg4py_usable():
@@ -183,7 +196,7 @@ def get_img_lib_available() -> list[str]:
 
 def _build_img_lib_available() -> list[str]:
     available: list[str] = []
-    for lib_name in _BUILTIN_LIB_TO_PACKAGE:
+    for lib_name in _iter_builtin_libs_in_order():
         if find_spec(lib_name) is None:
             continue
         if lib_name == "jpeg4py" and not _is_jpeg4py_usable():
