@@ -1,25 +1,41 @@
 from dataclasses import dataclass
-from typing import Sequence, Union
+from functools import partial
+from typing import Callable, Sequence, Union
 
-from argparsecfg import field_argument
 from argparsecfg.app import App
+from .argparse_compat import field_argument
 
 _KNOWN_COMMANDS = {"benchmark", "libs", "data"}
 
 _BENCHMARK_FLAG_ALLOWLIST = {
     "-n",
+    "--num_samples",
     "-t",
+    "--to",
     "-A",
+    "--all",
     "-l",
     "--img_lib",
     "-x",
+    "--exclude",
     "-m",
+    "--multiprocessing",
     "--nw",
 }
 
 _ROOT_ONLY_FLAGS = {"-h", "--help", "-V", "--version"}
 
-_FLAGS_WITH_VALUES = {"-n", "-t", "-l", "--img_lib", "-x", "--nw"}
+_FLAGS_WITH_VALUES = {
+    "-n",
+    "--num_samples",
+    "-t",
+    "--to",
+    "-l",
+    "--img_lib",
+    "-x",
+    "--exclude",
+    "--nw",
+}
 
 
 def _normalize_argv(argv: Sequence[str]) -> list[str]:
@@ -74,6 +90,58 @@ def _normalize_argv(argv: Sequence[str]) -> list[str]:
 
     # Positional argument - inject "benchmark"
     return ["benchmark", *argv]
+
+
+def _select_funcs_for_run(
+    func_dict: dict[str, Callable[[str], object]],
+    func_name: str | None,
+    exclude: str | None,
+) -> dict[str, Callable[[str], object]]:
+    if func_name:
+        if func_name in func_dict:
+            return {func_name: func_dict[func_name]}
+        return {}
+    if exclude:
+        return {name: func for name, func in func_dict.items() if name != exclude}
+    return dict(func_dict)
+
+
+def _get_multiprocessing_compat_errors(
+    func_dict: dict[str, Callable[[str], object]],
+    func_name: str | None,
+    exclude: str | None,
+) -> list[tuple[str, Exception]]:
+    from benchmark_utils.benchmark import try_run
+    from multiprocessing.reduction import ForkingPickler
+
+    errors: list[tuple[str, Exception]] = []
+    for name, func in _select_funcs_for_run(func_dict, func_name, exclude).items():
+        try:
+            ForkingPickler.dumps(partial(try_run, func))
+        except Exception as exc:  # pragma: no cover - exercised via CLI tests
+            errors.append((name, exc))
+    return errors
+
+
+def _probe_multiprocessing_workers(num_workers: int | None) -> None:
+    from multiprocessing import Pool, cpu_count
+
+    workers = cpu_count() if num_workers is None else num_workers
+    if workers <= 0:
+        workers = cpu_count()
+    with Pool(workers) as pool:
+        pool.map(int, [1])
+
+
+def _print_multiprocessing_start_error(exc: Exception) -> None:
+    import sys as _sys
+
+    print("Error: failed to start multiprocessing workers.", file=_sys.stderr)
+    print(f"Detail: {type(exc).__name__}: {exc}", file=_sys.stderr)
+    print(
+        "Try running without -m/--multiprocessing or adjust environment multiprocessing permissions.",
+        file=_sys.stderr,
+    )
 
 
 @dataclass
@@ -162,13 +230,21 @@ def _build_cli() -> App:
             help="Format for read image to: default: 'def', Pil: 'pil', or Numpy: 'np'.",
         )
         all: bool = field_argument(
-            "-A", default=False, action="store_true", help="Use all images from folder"
+            "-A",
+            default=False,
+            action="store_true",
+            help="Use all images from folder",
         )
         img_lib: str = field_argument(
-            "-l", "--img_lib", default=None, help="Image lib to test"
+            "-l",
+            "--img_lib",
+            default=None,
+            help="Image lib to test",
         )
         exclude: str = field_argument(
-            "-x", default=None, help="Image lib exclude from test"
+            "-x",
+            default=None,
+            help="Image lib exclude from test",
         )
         multiprocessing: bool = field_argument(
             "-m",
@@ -176,7 +252,10 @@ def _build_cli() -> App:
             action="store_true",
             help="use multiprocessing, default=False",
         )
-        nw: int = field_argument(default=None, help="num workers, if 0 -> use all cpus")
+        nw: int = field_argument(
+            default=None,
+            help="num workers, if 0 -> use all cpus",
+        )
 
     def benchmark(cfg: BenchmarkConfig) -> None:
         from pathlib import Path as StdLibPath
@@ -187,9 +266,44 @@ def _build_cli() -> App:
         if not StdLibPath(cfg.img_path).exists():
             print(f"Error: Img dir '{cfg.img_path}' does not exist!", file=_sys.stderr)
             raise SystemExit(1)
+        if cfg.nw is not None and cfg.nw < 0:
+            print("Error: --nw must be a non-negative integer.", file=_sys.stderr)
+            raise SystemExit(2)
+        num_workers = None if cfg.nw == 0 else cfg.nw
         if cfg.all:
             cfg.num_samples = 0
         filenames = get_img_filenames(cfg.img_path, num_samples=cfg.num_samples)
+
+        from .benchmark import BenchmarkImgRead
+
+        bench = BenchmarkImgRead(filenames=filenames, target_format=cfg.to)
+        if cfg.multiprocessing:
+            compat_errors = _get_multiprocessing_compat_errors(
+                bench.func_dict,
+                cfg.img_lib,
+                cfg.exclude,
+            )
+            if compat_errors:
+                print(
+                    "Error: selected image readers are not compatible with multiprocessing serialization.",
+                    file=_sys.stderr,
+                )
+                for name, exc in compat_errors:
+                    print(
+                        f"  - {name}: {type(exc).__name__}: {exc}",
+                        file=_sys.stderr,
+                    )
+                print(
+                    "Try running without -m/--multiprocessing or use pickle-safe backend callables.",
+                    file=_sys.stderr,
+                )
+                raise SystemExit(2)
+            try:
+                _probe_multiprocessing_workers(num_workers)
+            except (PermissionError, RuntimeError, OSError) as exc:
+                _print_multiprocessing_start_error(exc)
+                raise SystemExit(2) from exc
+
         if len(filenames) < cfg.num_samples:
             print(
                 f"! Number of files in {cfg.img_path}: {len(filenames)} less than num_samples: {cfg.num_samples}"
@@ -201,15 +315,18 @@ def _build_cli() -> App:
         else:
             print(f"{len(filenames)} images.")
 
-        from .benchmark import BenchmarkImgRead
-
-        bench = BenchmarkImgRead(filenames=filenames, target_format=cfg.to)
-        bench.run(
-            func_name=cfg.img_lib,
-            exclude=cfg.exclude,
-            multiprocessing=cfg.multiprocessing,
-            num_workers=cfg.nw,
-        )
+        try:
+            bench.run(
+                func_name=cfg.img_lib,
+                exclude=cfg.exclude,
+                multiprocessing=cfg.multiprocessing,
+                num_workers=num_workers,
+            )
+        except (PermissionError, RuntimeError, OSError) as exc:
+            if not cfg.multiprocessing:
+                raise
+            _print_multiprocessing_start_error(exc)
+            raise SystemExit(2) from exc
 
     cli.command(benchmark)
     return cli

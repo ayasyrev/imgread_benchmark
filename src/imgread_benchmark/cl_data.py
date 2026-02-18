@@ -1,6 +1,6 @@
 from dataclasses import dataclass
-from argparsecfg import field_argument
 from argparsecfg.app import app
+from .argparse_compat import field_argument
 from .datasets import DatasetProvider, ImagenetteProvider
 
 DATASET_PROVIDERS: dict[str, type[DatasetProvider]] = {

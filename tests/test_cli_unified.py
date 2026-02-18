@@ -1,4 +1,8 @@
-from imgread_benchmark.cli import _normalize_argv
+from pickle import PicklingError
+
+import pytest
+
+from imgread_benchmark.cli import _build_cli, _normalize_argv
 
 
 def test_normalize_injects_benchmark_for_path():
@@ -21,6 +25,17 @@ def test_normalize_argv_injects_benchmark_with_leading_flags():
 def test_normalize_argv_injects_benchmark_with_flag_without_value():
     argv = ["-A", "/imgs"]
     assert _normalize_argv(argv) == ["benchmark", "-A", "/imgs"]
+
+
+def test_normalize_argv_injects_benchmark_with_long_flags():
+    argv = ["--multiprocessing", "--to", "np", "/imgs"]
+    assert _normalize_argv(argv) == [
+        "benchmark",
+        "--multiprocessing",
+        "--to",
+        "np",
+        "/imgs",
+    ]
 
 
 def test_normalize_argv_keeps_root_help():
@@ -90,11 +105,6 @@ def test_cli_libs_prints_versions(monkeypatch, capsys):
     assert "PIL" in out and "10.0.0" in out
     assert "cv2" in out and "4.10.0" in out
 
-
-import pytest
-from imgread_benchmark.cli import _build_cli
-
-
 def test_benchmark_missing_path_errors_to_stderr(tmp_path, capsys):
     cli = _build_cli()
     with pytest.raises(SystemExit) as exc:
@@ -111,3 +121,135 @@ def test_data_unknown_dataset_errors_to_stderr(capsys):
     assert exc.value.code == 2
     captured = capsys.readouterr()
     assert "Unknown dataset" in captured.err
+
+
+def test_benchmark_nw_zero_means_all_cpus(tmp_path, monkeypatch):
+    calls = {}
+
+    class DummyBench:
+        def __init__(self, filenames, target_format):
+            self.func_dict = {"PIL": lambda _path: None}
+
+        def run(self, **kwargs):
+            calls.update(kwargs)
+
+    monkeypatch.setattr(
+        "imgread_benchmark.get_img_filenames.get_img_filenames",
+        lambda *_args, **_kwargs: [str(tmp_path / "img.jpg")],
+    )
+    monkeypatch.setattr("imgread_benchmark.benchmark.BenchmarkImgRead", DummyBench)
+
+    cli = _build_cli()
+    cli(["benchmark", str(tmp_path), "--nw", "0"])
+
+    assert calls["num_workers"] is None
+
+
+def test_benchmark_negative_nw_errors(tmp_path, capsys):
+    cli = _build_cli()
+    with pytest.raises(SystemExit) as exc:
+        cli(["benchmark", str(tmp_path), "--nw", "-1"])
+    assert exc.value.code == 2
+    captured = capsys.readouterr()
+    assert "--nw must be a non-negative integer" in captured.err
+
+
+def test_benchmark_multiprocessing_pickling_preflight_errors(tmp_path, monkeypatch, capsys):
+    run_called = {"value": False}
+
+    class DummyBench:
+        def __init__(self, filenames, target_format):
+            self.func_dict = {"PIL": lambda _path: None}
+
+        def run(self, **kwargs):
+            run_called["value"] = True
+
+    monkeypatch.setattr(
+        "imgread_benchmark.get_img_filenames.get_img_filenames",
+        lambda *_args, **_kwargs: [str(tmp_path / "img.jpg")],
+    )
+    monkeypatch.setattr("imgread_benchmark.benchmark.BenchmarkImgRead", DummyBench)
+    monkeypatch.setattr(
+        "imgread_benchmark.cli._get_multiprocessing_compat_errors",
+        lambda *_args, **_kwargs: [("PIL", PicklingError("not pickleable"))],
+    )
+
+    cli = _build_cli()
+    with pytest.raises(SystemExit) as exc:
+        cli(["benchmark", str(tmp_path), "--multiprocessing"])
+    assert exc.value.code == 2
+    captured = capsys.readouterr()
+    assert "not compatible with multiprocessing serialization" in captured.err
+    assert not run_called["value"]
+
+
+def test_benchmark_multiprocessing_permission_error_is_actionable(
+    tmp_path, monkeypatch, capsys
+):
+    run_called = {"value": False}
+
+    class DummyBench:
+        def __init__(self, filenames, target_format):
+            self.func_dict = {"PIL": lambda _path: None}
+
+        def run(self, **kwargs):
+            run_called["value"] = True
+
+    monkeypatch.setattr(
+        "imgread_benchmark.get_img_filenames.get_img_filenames",
+        lambda *_args, **_kwargs: [str(tmp_path / "img.jpg")],
+    )
+    monkeypatch.setattr("imgread_benchmark.benchmark.BenchmarkImgRead", DummyBench)
+    monkeypatch.setattr(
+        "imgread_benchmark.cli._get_multiprocessing_compat_errors",
+        lambda *_args, **_kwargs: [],
+    )
+
+    def _raise_permission(*_args, **_kwargs):
+        raise PermissionError("semaphore blocked")
+
+    monkeypatch.setattr(
+        "imgread_benchmark.cli._probe_multiprocessing_workers",
+        _raise_permission,
+    )
+
+    cli = _build_cli()
+    with pytest.raises(SystemExit) as exc:
+        cli(["benchmark", str(tmp_path), "--multiprocessing"])
+    assert exc.value.code == 2
+    captured = capsys.readouterr()
+    assert "failed to start multiprocessing workers" in captured.err
+    assert "Benchmarking with images from" not in captured.out
+    assert not run_called["value"]
+
+
+def test_benchmark_multiprocessing_runtime_oserror_is_actionable(
+    tmp_path, monkeypatch, capsys
+):
+    class DummyBench:
+        def __init__(self, filenames, target_format):
+            self.func_dict = {"PIL": lambda _path: None}
+
+        def run(self, **kwargs):
+            raise OSError("fork not allowed")
+
+    monkeypatch.setattr(
+        "imgread_benchmark.get_img_filenames.get_img_filenames",
+        lambda *_args, **_kwargs: [str(tmp_path / "img.jpg")],
+    )
+    monkeypatch.setattr("imgread_benchmark.benchmark.BenchmarkImgRead", DummyBench)
+    monkeypatch.setattr(
+        "imgread_benchmark.cli._get_multiprocessing_compat_errors",
+        lambda *_args, **_kwargs: [],
+    )
+    monkeypatch.setattr(
+        "imgread_benchmark.cli._probe_multiprocessing_workers",
+        lambda *_args, **_kwargs: None,
+    )
+
+    cli = _build_cli()
+    with pytest.raises(SystemExit) as exc:
+        cli(["benchmark", str(tmp_path), "--multiprocessing"])
+    assert exc.value.code == 2
+    captured = capsys.readouterr()
+    assert "failed to start multiprocessing workers" in captured.err

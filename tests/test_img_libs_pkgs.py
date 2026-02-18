@@ -129,9 +129,144 @@ def test_get_img_lib_available_cached():
     assert libs1 is libs2
 
 
+def test_additional_backends_are_appended_after_core(monkeypatch):
+    from imgread_benchmark.img_libs import img_libs_pkgs
+
+    def fake_find_spec(name):
+        if name in {"PIL", "local_rs", "imgread_rs"}:
+            return object()
+        return None
+
+    monkeypatch.setattr(img_libs_pkgs, "find_spec", fake_find_spec)
+    monkeypatch.setattr(img_libs_pkgs, "entry_points", lambda **kwargs: [])
+
+    img_libs_pkgs.get_plugin_entry_points.cache_clear()
+    img_libs_pkgs.get_lib_package_map.cache_clear()
+    img_libs_pkgs.get_img_lib_available.cache_clear()
+
+    libs = img_libs_pkgs.get_img_lib_available()
+
+    assert libs[:3] == ["PIL", "local_rs", "imgread_rs"]
+    assert "local_rs" not in img_libs_pkgs._CORE_BUILTIN_LIB_TO_PACKAGE
+    assert "local_rs" in img_libs_pkgs._ADDITIONAL_LIB_TO_PACKAGE
+
+
 def test_lazy_list_is_sequence():
     import collections.abc
 
     from imgread_benchmark.img_libs.img_libs_pkgs import img_lib_available
 
     assert isinstance(img_lib_available, collections.abc.Sequence)
+
+
+def test_entry_point_plugin_discovery(monkeypatch):
+    from imgread_benchmark.img_libs import img_libs_pkgs
+
+    class FakeDist:
+        name = "awesome-img-lib"
+
+    class FakeEntryPoint:
+        def __init__(self):
+            self.name = "awesome"
+            self.value = "awesome_plugin:adapter"
+            self.module = "awesome_plugin"
+            self.dist = FakeDist()
+
+        def load(self):
+            return types.SimpleNamespace(read_img=lambda _: "ok")
+
+    real_find_spec = importlib.util.find_spec
+
+    def fake_find_spec(name):
+        if name == "awesome_plugin":
+            return object()
+        return real_find_spec(name)
+
+    monkeypatch.setattr(img_libs_pkgs, "entry_points", lambda **kwargs: [FakeEntryPoint()])
+    monkeypatch.setattr(img_libs_pkgs, "find_spec", fake_find_spec)
+
+    img_libs_pkgs.get_plugin_entry_points.cache_clear()
+    img_libs_pkgs.get_lib_package_map.cache_clear()
+    img_libs_pkgs.get_img_lib_available.cache_clear()
+
+    plugins = img_libs_pkgs.get_plugin_entry_points()
+    assert "awesome" in plugins
+    assert img_libs_pkgs.get_lib_package_map()["awesome"] == "awesome-img-lib"
+    assert "awesome" in img_libs_pkgs.get_img_lib_available()
+
+
+def test_entry_point_collision_builtin_wins(monkeypatch):
+    from imgread_benchmark.img_libs import img_libs_pkgs
+
+    class FakeDist:
+        name = "shadow-pillow"
+
+    class FakeEntryPoint:
+        def __init__(self):
+            self.name = "PIL"
+            self.value = "shadow:adapter"
+            self.module = "shadow"
+            self.dist = FakeDist()
+
+        def load(self):
+            return types.SimpleNamespace(read_img=lambda _: "ok")
+
+    monkeypatch.setattr(img_libs_pkgs, "entry_points", lambda **kwargs: [FakeEntryPoint()])
+
+    img_libs_pkgs.get_plugin_entry_points.cache_clear()
+    img_libs_pkgs.get_lib_package_map.cache_clear()
+    img_libs_pkgs.get_img_lib_available.cache_clear()
+
+    assert "PIL" not in img_libs_pkgs.get_plugin_entry_points()
+    assert img_libs_pkgs.get_lib_package_map()["PIL"] == "pillow"
+
+
+def test_entry_point_is_available_hook(monkeypatch):
+    from imgread_benchmark.img_libs import img_libs_pkgs
+
+    class FakeEntryPoint:
+        name = "not_ready"
+        value = "not_ready:adapter"
+        module = "not_ready"
+        dist = None
+
+        def load(self):
+            return types.SimpleNamespace(is_available=lambda: False)
+
+    monkeypatch.setattr(img_libs_pkgs, "entry_points", lambda **kwargs: [FakeEntryPoint()])
+    monkeypatch.setattr(img_libs_pkgs, "find_spec", lambda _name: object())
+
+    img_libs_pkgs.get_plugin_entry_points.cache_clear()
+    img_libs_pkgs.get_lib_package_map.cache_clear()
+    img_libs_pkgs.get_img_lib_available.cache_clear()
+
+    assert "not_ready" in img_libs_pkgs.get_plugin_entry_points()
+    assert "not_ready" not in img_libs_pkgs.get_img_lib_available()
+
+
+def test_entry_point_load_error_warns_to_stderr(monkeypatch, capsys):
+    from imgread_benchmark.img_libs import img_libs_pkgs
+
+    class FakeEntryPoint:
+        name = "broken"
+        value = "broken:adapter"
+        module = "broken"
+        dist = None
+
+        def load(self):
+            raise RuntimeError("boom")
+
+    monkeypatch.setattr(img_libs_pkgs, "entry_points", lambda **kwargs: [FakeEntryPoint()])
+    monkeypatch.setattr(img_libs_pkgs, "find_spec", lambda _name: object())
+    monkeypatch.setattr(
+        img_libs_pkgs, "_iter_builtin_libs_in_order", lambda: ("PIL",)
+    )
+
+    img_libs_pkgs.get_plugin_entry_points.cache_clear()
+    img_libs_pkgs.get_lib_package_map.cache_clear()
+    img_libs_pkgs.get_img_lib_available.cache_clear()
+
+    assert "broken" in img_libs_pkgs.get_plugin_entry_points()
+    assert "broken" not in img_libs_pkgs.get_img_lib_available()
+    captured = capsys.readouterr()
+    assert "Could not load plugin entry point 'broken': boom" in captured.err

@@ -1,4 +1,14 @@
+from functools import partial
+from multiprocessing.reduction import ForkingPickler
+
+from benchmark_utils.benchmark import try_run
+
 from imgread_benchmark import benchmark as benchmark_mod
+from imgread_benchmark.read_img import graceful_degradation
+
+
+def _dummy_reader_for_pickle(_path: str) -> str:
+    return "ok"
 
 
 def test_get_read_to_format_returns_dicts():
@@ -22,3 +32,9 @@ def test_benchmark_img_read_with_dummy_funcs():
 
     assert bench.func_dict["dummy"]("/tmp/x.jpg") == "ok"
     assert "dummy" in bench.func_names
+
+
+def test_graceful_degradation_wrapper_is_pickleable_for_multiprocessing():
+    wrapped = graceful_degradation(_dummy_reader_for_pickle)
+    payload = partial(try_run, wrapped)
+    ForkingPickler.dumps(payload)
