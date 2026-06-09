@@ -1,8 +1,8 @@
 from pathlib import Path
 import sys
-from argparsecfg import field_argument
 from argparsecfg.app import app
 from dataclasses import dataclass
+from .argparse_compat import field_argument
 from .benchmark import BenchmarkImgRead
 from .get_img_filenames import get_img_filenames
 

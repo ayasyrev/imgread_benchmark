@@ -2,7 +2,14 @@
 tmp*/
 cov.xml
 .vscode/
-
+Prj
+Data
+.data/
+conductor
+AGENTS.md
+GEMINI.md
+.gemini
+docs/
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]

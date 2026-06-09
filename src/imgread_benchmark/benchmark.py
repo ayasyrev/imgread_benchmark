@@ -4,13 +4,16 @@ from typing import Callable, Dict, List, Literal, Optional
 from benchmark_utils import BenchmarkIter
 
 from .get_img_filenames import get_img_filenames
-from .read_img import read_img, read_img_ndarray, read_img_pil
 
-READ_TO_FORMAT = {
-    "def": read_img,
-    "pil": read_img_pil,
-    "np": read_img_ndarray,
-}
+
+def _get_read_to_format() -> Dict[str, Callable]:
+    from .read_img import get_read_img, get_read_img_ndarray, get_read_img_pil
+
+    return {
+        "def": get_read_img(),
+        "pil": get_read_img_pil(),
+        "np": get_read_img_ndarray(),
+    }
 
 __all__ = ["BenchmarkImgRead"]
 
@@ -29,7 +32,7 @@ class BenchmarkImgRead(BenchmarkIter):
         clear_progress: bool = False,
     ):
         self._target_format = target_format
-        func_to_test = func_dict or READ_TO_FORMAT[target_format]
+        func_to_test = func_dict or _get_read_to_format()[target_format]
         img_path = img_path or "."
         if filenames is None:
             filenames = get_img_filenames(img_path, num_samples=num_samples)
@@ -46,12 +49,13 @@ class BenchmarkImgRead(BenchmarkIter):
 
     @target_format.setter
     def target_format(self, target_format: Literal["def", "pil", "np"]) -> None:
-        if target_format not in READ_TO_FORMAT:
+        read_to_format = _get_read_to_format()
+        if target_format not in read_to_format:
             print(f"{target_format} not in available format.")
-            print("available: ", ", ".join(READ_TO_FORMAT.keys()))
+            print("available: ", ", ".join(read_to_format.keys()))
         else:
             self._target_format = target_format
-            self.func_dict = READ_TO_FORMAT[target_format]
+            self.func_dict = read_to_format[target_format]
 
     @property
     def func_names(self) -> str:
