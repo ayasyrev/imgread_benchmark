@@ -62,7 +62,7 @@ class DatasetProvider(abc.ABC):
 
         archive_path = self.dataset_dir / archive_name
 
-        response = requests.get(url, stream=True)
+        response = requests.get(url, stream=True, timeout=30)
         response.raise_for_status()
         total_size = int(response.headers.get("content-length", 0))
 
@@ -81,8 +81,10 @@ class DatasetProvider(abc.ABC):
                     f.write(chunk)
                     progress.update(task, advance=len(chunk))
 
-        self.extract(archive_path)
-        archive_path.unlink(missing_ok=True)  # Remove archive after extraction
+        try:
+            self.extract(archive_path)
+        finally: 
+            archive_path.unlink(missing_ok=True)  # Remove archive after extraction
         sentinel.touch()
         console.print(
             f"[green]✓[/green] {self.name} dataset downloaded successfully ({size})."
