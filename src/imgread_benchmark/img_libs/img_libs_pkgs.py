@@ -122,7 +122,7 @@ def _entry_point_module_exists(ep: EntryPoint) -> bool:
     if not module:
         return True
     try:
-        return find_spec(module) is not None
+        return find_spec(module.split(".")[0]) is not None
     except ModuleNotFoundError:
         return False
 

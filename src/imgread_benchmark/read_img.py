@@ -28,7 +28,7 @@ class _GracefulReadCallable:
         self.__name__ = getattr(func, "__name__", self.__class__.__name__)
         self.__qualname__ = getattr(func, "__qualname__", self.__name__)
         self.__module__ = getattr(func, "__module__", __name__)
-        self.__doc__ = getattr(func, "__doc__")
+        self.__doc__ = getattr(func, "__doc__", None)
 
     def __call__(self, img_path: str, *args: Any, **kwargs: Any) -> Any:
         try:
