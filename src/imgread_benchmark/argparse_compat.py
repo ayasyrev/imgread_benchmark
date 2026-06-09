@@ -50,8 +50,6 @@ def field_argument(
         "hash": hash,
         "compare": compare,
     }
-    if sys.version_info.minor >= 10:  # pragma: no branch
-        field_kwargs["kw_only"] = kw_only
 
     if metadata is not None:
         arg_metadata.update(metadata)
