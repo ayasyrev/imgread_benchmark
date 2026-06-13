@@ -1,11 +1,13 @@
 import numpy as np
+import pytest
 from PIL import Image
 from unittest.mock import MagicMock, patch
 
-from imgread_benchmark.img_libs import ajpegli, imagecodecs, simplejpeg, turbojpeg
-
 
 def test_ajpegli_adapter():
+    pytest.importorskip("ajpegli")
+    from imgread_benchmark.img_libs import ajpegli
+
     with patch("ajpegli.imread") as mock_imread:
         mock_imread.return_value = np.zeros((10, 10, 3), dtype=np.uint8)
 
@@ -19,6 +21,9 @@ def test_ajpegli_adapter():
 
 
 def test_simplejpeg_adapter():
+    pytest.importorskip("simplejpeg")
+    from imgread_benchmark.img_libs import simplejpeg
+
     with patch("builtins.open", MagicMock()):
         with patch("simplejpeg.decode_jpeg") as mock_decode:
             mock_decode.return_value = np.zeros((10, 10, 3), dtype=np.uint8)
@@ -31,6 +36,9 @@ def test_simplejpeg_adapter():
 
 
 def test_turbojpeg_adapter():
+    pytest.importorskip("turbojpeg")
+    from imgread_benchmark.img_libs import turbojpeg
+
     with patch("builtins.open", MagicMock()):
         with patch("turbojpeg.decompress") as mock_decompress:
             # We need something that np.array() can handle.
@@ -48,6 +56,9 @@ def test_turbojpeg_adapter():
 
 
 def test_imagecodecs_adapter():
+    pytest.importorskip("imagecodecs")
+    from imgread_benchmark.img_libs import imagecodecs
+
     with patch("imagecodecs.imread") as mock_imread:
         # Test RGB
         mock_imread.return_value = np.zeros((10, 10, 3), dtype=np.uint8)
