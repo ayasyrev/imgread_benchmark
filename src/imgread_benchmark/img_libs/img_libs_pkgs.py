@@ -192,6 +192,10 @@ def get_img_lib_available() -> list[str]:
             continue
         if lib_name == "jpeg4py" and not _is_jpeg4py_usable():
             continue
+        try:
+            load_img_lib_adapter(lib_name)
+        except Exception:
+            continue
         available.append(lib_name)
     for lib_name, ep in get_plugin_entry_points().items():
         if _plugin_is_available(ep):
