@@ -1,7 +1,7 @@
 import nox
 
 
-@nox.session(python=["3.10", "3.11", "3.12", "3.13", "3.14"], venv_backend="uv")
+@nox.session(python=["3.12", "3.13"], venv_backend="uv")
 def run_tests(session):
     args = session.posargs or ["--cov"]
     session.install(

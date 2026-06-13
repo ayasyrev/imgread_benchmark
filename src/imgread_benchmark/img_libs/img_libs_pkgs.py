@@ -13,7 +13,11 @@ ENTRY_POINT_GROUP = "imgread_benchmark.img_libs"
 _CORE_BUILTIN_LIB_TO_PACKAGE = {
     "PIL": "pillow",
     "accimage": "accimage",  # only conda
+    "ajpegli": "ajpegli",
+    "imagecodecs": "imagecodecs",
     "jpeg4py": "jpeg4py",
+    "simplejpeg": "simplejpeg",
+    "turbojpeg": "turbojpeg",
     "cv2": "opencv-python-headless",  # conda - opencv
     "skimage": "scikit-image",  # conda
     "imageio": "imageio",  # conda

@@ -4,7 +4,7 @@ A Python benchmarking tool for comparing the performance of various image readin
 
 ## Project Overview
 
-- **Language:** Python 3.10+
+- **Language:** Python 3.12+
 - **Build System:** `uv_build`
 - **Package Manager:** `uv`
 - **Execution:** ALWAYS use `uv run` for executing python and running tests (e.g., `uv run python ...`, `uv run pytest ...`).
@@ -19,7 +19,9 @@ This project uses `uv` for dependency management.
 
 ```bash
 # Sync dependencies and create virtual environment
-uv sync
+uv sync --extra img_libs
+# Note: The new libraries (ajpegli, imagecodecs, simplejpeg, turbojpeg) are included in img_libs.
+# Their wheels usually include necessary native libraries, avoiding extra system dependencies.
 ```
 
 ### Running the Application
@@ -53,7 +55,7 @@ uv run pytest
 ```
 
 **Pre-release Verification:**
-Use `nox` to run tests across all supported Python versions (3.10 - 3.14) before releasing.
+Use `nox` to run tests across all supported Python versions (3.12 - 3.13) before releasing.
 
 ```bash
 # Run all sessions

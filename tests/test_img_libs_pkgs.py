@@ -138,6 +138,7 @@ def test_additional_backends_are_appended_after_core(monkeypatch):
         return None
 
     monkeypatch.setattr(img_libs_pkgs, "find_spec", fake_find_spec)
+    monkeypatch.setattr(img_libs_pkgs, "load_img_lib_adapter", lambda name: None)
     monkeypatch.setattr(img_libs_pkgs, "entry_points", lambda **kwargs: [])
 
     img_libs_pkgs.get_plugin_entry_points.cache_clear()
@@ -184,6 +185,7 @@ def test_entry_point_plugin_discovery(monkeypatch):
 
     monkeypatch.setattr(img_libs_pkgs, "entry_points", lambda **kwargs: [FakeEntryPoint()])
     monkeypatch.setattr(img_libs_pkgs, "find_spec", fake_find_spec)
+    monkeypatch.setattr(img_libs_pkgs, "load_img_lib_adapter", lambda name: None)
 
     img_libs_pkgs.get_plugin_entry_points.cache_clear()
     img_libs_pkgs.get_lib_package_map.cache_clear()
@@ -270,3 +272,20 @@ def test_entry_point_load_error_warns_to_stderr(monkeypatch, capsys):
     assert "broken" not in img_libs_pkgs.get_img_lib_available()
     captured = capsys.readouterr()
     assert "Could not load plugin entry point 'broken': boom" in captured.err
+
+def test_new_libs_in_registry():
+    from imgread_benchmark.img_libs.img_libs_pkgs import _CORE_BUILTIN_LIB_TO_PACKAGE
+    assert "ajpegli" in _CORE_BUILTIN_LIB_TO_PACKAGE
+    assert "imagecodecs" in _CORE_BUILTIN_LIB_TO_PACKAGE
+    assert "simplejpeg" in _CORE_BUILTIN_LIB_TO_PACKAGE
+    assert "turbojpeg" in _CORE_BUILTIN_LIB_TO_PACKAGE
+
+def test_builtin_libs_order():
+    from imgread_benchmark.img_libs.img_libs_pkgs import _iter_builtin_libs_in_order
+    order = _iter_builtin_libs_in_order()
+    # Check some positions
+    assert order.index("ajpegli") < order.index("cv2")
+    assert order.index("imagecodecs") < order.index("cv2")
+    assert order.index("simplejpeg") < order.index("cv2")
+    assert order.index("turbojpeg") < order.index("cv2")
+    assert order.index("PIL") < order.index("ajpegli")
