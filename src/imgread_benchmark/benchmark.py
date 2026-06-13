@@ -15,6 +15,7 @@ def _get_read_to_format() -> Dict[str, Callable]:
         "np": get_read_img_ndarray(),
     }
 
+
 __all__ = ["BenchmarkImgRead"]
 
 

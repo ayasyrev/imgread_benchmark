@@ -126,9 +126,9 @@ def _get_multiprocessing_compat_errors(
 def _probe_multiprocessing_workers(num_workers: int | None) -> None:
     from multiprocessing import Pool, cpu_count
 
-    cpu_num = cpu_count() or 1  
-    workers = cpu_num if num_workers is None else num_workers  
-    if workers <= 0:  
+    cpu_num = cpu_count() or 1
+    workers = cpu_num if num_workers is None else num_workers
+    if workers <= 0:
         workers = cpu_num
     with Pool(workers) as pool:
         pool.map(int, [1])
@@ -274,9 +274,9 @@ def _build_cli() -> App:
         if cfg.all:
             cfg.num_samples = 0
         filenames = get_img_filenames(cfg.img_path, num_samples=cfg.num_samples)
-        if not filenames:  
-            print(f"Error: No images found in '{cfg.img_path}'!", file=_sys.stderr)  
-            raise SystemExit(1) 
+        if not filenames:
+            print(f"Error: No images found in '{cfg.img_path}'!", file=_sys.stderr)
+            raise SystemExit(1)
 
         from .benchmark import BenchmarkImgRead
 

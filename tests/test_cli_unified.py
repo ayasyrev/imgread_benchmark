@@ -105,6 +105,7 @@ def test_cli_libs_prints_versions(monkeypatch, capsys):
     assert "PIL" in out and "10.0.0" in out
     assert "cv2" in out and "4.10.0" in out
 
+
 def test_benchmark_missing_path_errors_to_stderr(tmp_path, capsys):
     cli = _build_cli()
     with pytest.raises(SystemExit) as exc:
@@ -154,7 +155,9 @@ def test_benchmark_negative_nw_errors(tmp_path, capsys):
     assert "--nw must be a non-negative integer" in captured.err
 
 
-def test_benchmark_multiprocessing_pickling_preflight_errors(tmp_path, monkeypatch, capsys):
+def test_benchmark_multiprocessing_pickling_preflight_errors(
+    tmp_path, monkeypatch, capsys
+):
     run_called = {"value": False}
 
     class DummyBench:
