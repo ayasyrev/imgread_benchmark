@@ -11,8 +11,9 @@ def read_img(img_path: str) -> np.ndarray:
     Returns:
         np.ndarray: Image as numpy array with shape (width, height, channels)
     """
-    img = cv2.imread(img_path)
-    return cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+    # img = cv2.imread(img_path)
+    # return cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+    return cv2.imread(img_path, cv2.IMREAD_COLOR_RGB)
 
 
 def read_img_pil(img_path: str) -> Image.Image:
