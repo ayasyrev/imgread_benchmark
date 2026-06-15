@@ -13,7 +13,11 @@ ENTRY_POINT_GROUP = "imgread_benchmark.img_libs"
 _CORE_BUILTIN_LIB_TO_PACKAGE = {
     "PIL": "pillow",
     "accimage": "accimage",  # only conda
+    "ajpegli": "ajpegli",
+    "imagecodecs": "imagecodecs",
     "jpeg4py": "jpeg4py",
+    "simplejpeg": "simplejpeg",
+    "turbojpeg": "turbojpeg",
     "cv2": "opencv-python-headless",  # conda - opencv
     "skimage": "scikit-image",  # conda
     "imageio": "imageio",  # conda
@@ -191,6 +195,10 @@ def get_img_lib_available() -> list[str]:
         if find_spec(lib_name) is None:
             continue
         if lib_name == "jpeg4py" and not _is_jpeg4py_usable():
+            continue
+        try:
+            load_img_lib_adapter(lib_name)
+        except Exception:
             continue
         available.append(lib_name)
     for lib_name, ep in get_plugin_entry_points().items():

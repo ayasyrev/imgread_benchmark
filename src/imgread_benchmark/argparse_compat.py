@@ -1,5 +1,4 @@
 from dataclasses import MISSING, field as dataclass_field
-import sys
 from typing import Any
 
 from argparsecfg.core import add_argument_metadata

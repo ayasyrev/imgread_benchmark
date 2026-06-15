@@ -3,7 +3,6 @@ from typing import Literal
 import kornia as K
 import numpy as np
 import torch
-import torchvision.transforms.v2.functional as F
 from kornia import io
 from PIL import Image
 
@@ -16,7 +15,7 @@ __all__ = [
 
 def read_img(
     img_path: str,
-    load_type: io.ImageLoadType = io.ImageLoadType.UNCHANGED,
+    load_type: io.ImageLoadType = io.ImageLoadType.RGB8,
     device: Literal["cpu", "cuda"] = "cpu",
 ) -> torch.Tensor:
     """Read image from path with kornia.io. Returns torch.Tensor.
@@ -42,4 +41,4 @@ def read_img_pil(img_path: str) -> Image.Image:
     Returns:
         PIL.Image: Image as PIL.Image
     """
-    return F.to_pil_image(read_img(img_path))
+    return Image.fromarray(read_img_ndarray(img_path))
