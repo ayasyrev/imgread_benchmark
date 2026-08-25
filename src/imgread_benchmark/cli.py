@@ -21,6 +21,8 @@ _BENCHMARK_FLAG_ALLOWLIST = {
     "-m",
     "--multiprocessing",
     "--nw",
+    "-r",
+    "--repeats",
 }
 
 _ROOT_ONLY_FLAGS = {"-h", "--help", "-V", "--version"}
@@ -35,6 +37,8 @@ _FLAGS_WITH_VALUES = {
     "-x",
     "--exclude",
     "--nw",
+    "-r",
+    "--repeats",
 }
 
 
@@ -257,6 +261,12 @@ def _build_cli() -> App:
             default=None,
             help="num workers, if 0 -> use all cpus",
         )
+        repeats: int = field_argument(
+            "-r",
+            "--repeats",
+            default=5,
+            help="Number of repeat runs, default 5",
+        )
 
     def benchmark(cfg: BenchmarkConfig) -> None:
         from pathlib import Path as StdLibPath
@@ -280,7 +290,9 @@ def _build_cli() -> App:
 
         from .benchmark import BenchmarkImgRead
 
-        bench = BenchmarkImgRead(filenames=filenames, target_format=cfg.to)
+        bench = BenchmarkImgRead(
+            filenames=filenames, target_format=cfg.to, num_repeats=cfg.repeats
+        )
         if cfg.multiprocessing:
             compat_errors = _get_multiprocessing_compat_errors(
                 bench.func_dict,

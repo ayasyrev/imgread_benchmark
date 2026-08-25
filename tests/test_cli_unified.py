@@ -128,7 +128,7 @@ def test_benchmark_nw_zero_means_all_cpus(tmp_path, monkeypatch):
     calls = {}
 
     class DummyBench:
-        def __init__(self, filenames, target_format):
+        def __init__(self, *args, **kwargs):
             self.func_dict = {"PIL": lambda _path: None}
 
         def run(self, **kwargs):
@@ -161,7 +161,7 @@ def test_benchmark_multiprocessing_pickling_preflight_errors(
     run_called = {"value": False}
 
     class DummyBench:
-        def __init__(self, filenames, target_format):
+        def __init__(self, *args, **kwargs):
             self.func_dict = {"PIL": lambda _path: None}
 
         def run(self, **kwargs):
@@ -192,7 +192,7 @@ def test_benchmark_multiprocessing_permission_error_is_actionable(
     run_called = {"value": False}
 
     class DummyBench:
-        def __init__(self, filenames, target_format):
+        def __init__(self, *args, **kwargs):
             self.func_dict = {"PIL": lambda _path: None}
 
         def run(self, **kwargs):
@@ -230,7 +230,7 @@ def test_benchmark_multiprocessing_runtime_oserror_is_actionable(
     tmp_path, monkeypatch, capsys
 ):
     class DummyBench:
-        def __init__(self, filenames, target_format):
+        def __init__(self, *args, **kwargs):
             self.func_dict = {"PIL": lambda _path: None}
 
         def run(self, **kwargs):
@@ -256,3 +256,31 @@ def test_benchmark_multiprocessing_runtime_oserror_is_actionable(
     assert exc.value.code == 2
     captured = capsys.readouterr()
     assert "failed to start multiprocessing workers" in captured.err
+
+
+def test_normalize_argv_injects_benchmark_with_repeats():
+    argv = ["-r", "3", "/imgs"]
+    assert _normalize_argv(argv) == ["benchmark", "-r", "3", "/imgs"]
+
+
+def test_benchmark_respects_repeats(tmp_path, monkeypatch):
+    calls = {}
+
+    class DummyBench:
+        def __init__(self, filenames, target_format, num_repeats):
+            self.func_dict = {"PIL": lambda _path: None}
+            calls["num_repeats"] = num_repeats
+
+        def run(self, **kwargs):
+            pass
+
+    monkeypatch.setattr("imgread_benchmark.benchmark.BenchmarkImgRead", DummyBench)
+    monkeypatch.setattr(
+        "imgread_benchmark.get_img_filenames.get_img_filenames",
+        lambda *args, **kwargs: ["img1.jpg"],
+    )
+
+    from imgread_benchmark.cli import main
+
+    main(["benchmark", str(tmp_path), "-r", "7"])
+    assert calls["num_repeats"] == 7

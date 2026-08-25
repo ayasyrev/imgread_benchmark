@@ -32,6 +32,16 @@ def test_benchmark_img_read_with_dummy_funcs():
 
     assert bench.func_dict["dummy"]("/tmp/x.jpg") == "ok"
     assert "dummy" in bench.func_names
+    assert bench.num_repeats == 1
+
+
+def test_benchmark_img_read_respects_num_repeats():
+    bench = benchmark_mod.BenchmarkImgRead(
+        filenames=["img1.jpg", "img2.jpg"],
+        func_dict={"dummy": lambda x: x},
+        num_repeats=3,
+    )
+    assert bench.num_repeats == 3
 
 
 def test_graceful_degradation_wrapper_is_pickleable_for_multiprocessing():
