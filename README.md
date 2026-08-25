@@ -7,6 +7,29 @@ Benchmark for read images with different libs.
 UV_CACHE_DIR=.uv-cache uv run imgread_benchmark libs
 ```
 
+## Benchmarking
+
+To run the benchmark against a directory of images:
+
+```bash
+uv run imgread_benchmark /path/to/images [options]
+```
+
+### Options
+
+- `-n`, `--num_samples`: Number of images to use for the benchmark (default: 200).
+- `-t`, `--to`: Target format (`def`, `pil`, `np`).
+- `-r`, `--repeats`: Number of repeat runs for each image (default: 5).
+- `-l`, `--img_lib`: Test only a specific library.
+- `-x`, `--exclude`: Exclude a specific library from the test.
+- `-m`, `--multiprocessing`: Use multiprocessing for benchmarking.
+- `-A`, `--all`: Use all images from the folder (ignores `-n`).
+
+Example:
+```bash
+uv run imgread_benchmark /path/to/images -r 10 -n 100 -t np
+```
+
 ## Dataset Management
 
 You can download standard datasets for benchmarking using the `imgread_benchmark data` subcommand.
