@@ -5,6 +5,7 @@ cov.xml
 Prj
 Data
 .data/
+.worktrees/
 conductor
 AGENTS.md
 GEMINI.md
