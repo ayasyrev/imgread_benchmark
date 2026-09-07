@@ -151,6 +151,9 @@ failed epoch, a run error, completion, or EOF; waiting for stdout or process exi
 uses that same deadline. A stalled teardown fails even without a configuration
 timeout. Further runs are refused if a prior group
 cannot be cleaned up. Main-thread SIGTERM and Ctrl-C use the same cleanup path.
+Read/iteration failures are published before teardown. Their reader/path context
+remains the primary error if shutdown also fails; later errors are retained in
+`error.secondary_errors`.
 
 ## Resource measurements
 

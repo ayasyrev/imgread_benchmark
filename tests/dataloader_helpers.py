@@ -117,7 +117,15 @@ def stalled_teardown_child(mode):
     if mode == "done":
         emit("done", status="success")
     elif mode == "run_error":
-        emit("run_error", error={"reason": "injected error"})
+        emit(
+            "run_error",
+            error={
+                "reason": "injected read failure",
+                "reader": "pil-rgb",
+                "path": request["manifest"]["entries"][0]["path"],
+                "stage": "read",
+            },
+        )
     elif mode == "eof":
         os.close(sys.stdout.fileno())
     else:
@@ -170,7 +178,11 @@ def teardown_caller(root, mode):
         )
     except BenchmarkRunError as exc:
         assert exc.result.status == "failed"
-        assert "shutdown timeout" in exc.result.error["reason"]
+        errors = [exc.result.error, *exc.result.error.get("secondary_errors", [])]
+        assert any("shutdown timeout" in error["reason"] for error in errors)
+        if mode == "run_error":
+            assert exc.result.error["reason"] == "injected read failure"
+            assert exc.result.error["path"] == str(root / "000.png")
         assert time.monotonic() - start < 8
         assert not runner.group_members(int((root / "consumer.pid").read_text()))
         assert signal.getsignal(signal.SIGTERM) == original_sigterm

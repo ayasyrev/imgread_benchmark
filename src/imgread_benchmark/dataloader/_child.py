@@ -6,7 +6,7 @@ import signal
 import sys
 import threading
 
-from .models import DataLoaderConfig, FileManifest
+from .models import DataLoaderConfig, FileManifest, error_details
 
 
 def main():
@@ -14,6 +14,7 @@ def main():
     os.dup2(sys.stderr.fileno(), sys.stdout.fileno())
     lock = threading.Lock()
     config_id = None
+    config = None
 
     def emit(event, **payload):
         with lock:
@@ -62,19 +63,7 @@ def main():
     except BaseException as exc:
         emit(
             "run_error",
-            error=dict(
-                stage=getattr(exc, "stage", "execution"),
-                reader=getattr(
-                    exc,
-                    "reader",
-                    locals().get("config", None).reader
-                    if "config" in locals()
-                    else None,
-                ),
-                path=getattr(exc, "path", None),
-                reason=f"{type(exc).__name__}: {exc}",
-                cancelled=isinstance(exc, KeyboardInterrupt),
-            ),
+            error=error_details(exc, config.reader if config is not None else None),
         )
         emit("done", status="failed")
         return 1

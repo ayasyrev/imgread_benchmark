@@ -371,7 +371,11 @@ def test_teardown_is_bounded_without_configuration_timeout(tmp_path, mode):
             timeout=15,
         )
         assert completed.returncode == 0, completed.stderr
-        assert "shutdown timeout" in json.loads(completed.stdout)["error"]["reason"]
+        error = json.loads(completed.stdout)["error"]
+        assert any(
+            "shutdown timeout" in item["reason"]
+            for item in [error, *error.get("secondary_errors", [])]
+        )
         assert not group_members(int((tmp_path / "consumer.pid").read_text()))
     finally:
         pid_file = tmp_path / "consumer.pid"
@@ -430,3 +434,39 @@ def test_effective_pinning_is_observed_after_timer(tmp_path, monkeypatch, observ
     assert pinning["last_batch_observed"] is observed
     assert pinning["status"] == ("observed_pinned" if observed else "observed_unpinned")
     assert bool(pinning["warnings"]) is not observed
+
+
+def test_iteration_error_is_published_before_teardown(tmp_path, monkeypatch):
+    from imgread_benchmark.dataloader import engine
+    from imgread_benchmark.dataloader.models import EpochResult, ImageReadError
+
+    paths = make_images(tmp_path, 1)
+    error = ImageReadError("pil-rgb", str(paths[0]), "bad payload")
+    epoch = EpochResult.measured(0, 1, 2, 0, 0, 0, "order", "prefix", status="failed")
+    events = []
+
+    def teardown(*args):
+        assert events[-1][0] == "run_error"
+        assert events[-1][1]["error"]["path"] == str(paths[0])
+        events.append(("teardown", {}))
+        raise RuntimeError("secondary teardown failure")
+
+    monkeypatch.setattr(engine, "thread_policy", lambda reader: {})
+    monkeypatch.setattr(
+        engine, "consume_epoch", lambda *args: (epoch, None, None, error)
+    )
+    monkeypatch.setattr(engine, "close_loader", teardown)
+    with pytest.raises(RuntimeError, match="secondary teardown failure"):
+        engine.execute(
+            snapshot_files(paths),
+            DataLoaderConfig(epochs=1),
+            "test",
+            lambda event, **data: events.append((event, data)),
+            lambda: None,
+        )
+    assert [event for event, _ in events] == [
+        "ready",
+        "epoch_result",
+        "run_error",
+        "teardown",
+    ]

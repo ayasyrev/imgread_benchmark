@@ -26,6 +26,17 @@ def digest(value: Any) -> str:
     return hashlib.sha256(canonical_json(value).encode("utf-8")).hexdigest()
 
 
+def error_details(exc, reader=None):
+    """Serialize a failure before teardown can replace its traceback or context."""
+    return dict(
+        stage=getattr(exc, "stage", "execution"),
+        reader=getattr(exc, "reader", reader),
+        path=getattr(exc, "path", None),
+        reason=f"{type(exc).__name__}: {exc}",
+        cancelled=isinstance(exc, KeyboardInterrupt),
+    )
+
+
 @dataclass(frozen=True)
 class DataLoaderConfig:
     reader: str = "pil-rgb"

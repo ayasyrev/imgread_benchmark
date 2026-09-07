@@ -11,7 +11,7 @@ from dataclasses import asdict
 from functools import partial
 from importlib.metadata import version
 
-from .models import EpochResult, ImageReadError, digest
+from .models import EpochResult, ImageReadError, digest, error_details
 
 
 def thread_policy(reader):
@@ -253,6 +253,9 @@ def execute(manifest, config, execution_id, emit, wait_go):
             )
             emit("epoch_result", epoch=asdict(epoch), pinning=pinning)
             if error is not None:
+                # Teardown may itself fail or exhaust the coordinator's grace
+                # budget. Preserve the read/iteration failure first.
+                emit("run_error", error=error_details(error, config.reader))
                 raise error
     finally:
         try:

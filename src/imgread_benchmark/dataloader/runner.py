@@ -128,6 +128,15 @@ def run_benchmark(manifest, config, *, timeout_seconds=None):
     deadline = invoked_at + timeout_seconds if timeout_seconds else None
     teardown_deadline = None
     old_sigterm = None
+
+    def record_error(error):
+        if result.error is None:
+            result.error = error
+        elif result.error != error:
+            result.error.setdefault("secondary_errors", []).append(error)
+            if error.get("cancelled"):
+                result.error["cancelled"] = True
+
     if threading.current_thread() is threading.main_thread():
         old_sigterm = signal.getsignal(signal.SIGTERM)
 
@@ -234,7 +243,7 @@ def run_benchmark(manifest, config, *, timeout_seconds=None):
                 ):
                     teardown_deadline = time.monotonic() + _SHUTDOWN_GRACE_SECONDS
             elif kind == "run_error":
-                result.error = event["error"]
+                record_error(event["error"])
                 if teardown_deadline is None:
                     teardown_deadline = time.monotonic() + _SHUTDOWN_GRACE_SECONDS
             elif kind == "done":
@@ -264,12 +273,14 @@ def run_benchmark(manifest, config, *, timeout_seconds=None):
             raise RuntimeError("incomplete epoch sequence")
     except BaseException as exc:
         result.status = "failed"
-        result.error = dict(
-            stage="coordinator",
-            reader=config.reader,
-            path=None,
-            reason=f"{type(exc).__name__}: {exc}",
-            cancelled=isinstance(exc, KeyboardInterrupt),
+        record_error(
+            dict(
+                stage="coordinator",
+                reader=config.reader,
+                path=None,
+                reason=f"{type(exc).__name__}: {exc}",
+                cancelled=isinstance(exc, KeyboardInterrupt),
+            )
         )
     finally:
         if sampler is not None:
@@ -282,8 +293,13 @@ def run_benchmark(manifest, config, *, timeout_seconds=None):
                 )
             except Exception as exc:
                 result.status = "failed"
-                result.error = dict(
-                    stage="cleanup", reader=config.reader, path=None, reason=str(exc)
+                record_error(
+                    dict(
+                        stage="cleanup",
+                        reader=config.reader,
+                        path=None,
+                        reason=str(exc),
+                    )
                 )
             for thread in readers:
                 thread.join(timeout=2)
