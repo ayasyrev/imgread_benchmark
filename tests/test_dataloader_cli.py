@@ -237,3 +237,37 @@ def test_acceptance_rejects_orphan_and_records_failures(tmp_path, monkeypatch):
     )
     assert json.loads((output / "invocation.json").read_text())["logical_id"] == "id"
     assert (output / "stderr.txt").exists()
+
+
+@pytest.mark.parametrize("affinity", [{0}, {0, 2, 4}, {0, 2, 4, 6}])
+def test_acceptance_headroom_checks_available_cpus(tmp_path, monkeypatch, affinity):
+    from importlib import metadata
+    from types import SimpleNamespace
+    from tests import dataloader_smoke as smoke
+
+    psutil = pytest.importorskip("psutil")
+    monkeypatch.setattr(smoke.platform, "system", lambda: "Linux")
+    monkeypatch.setattr(smoke.platform, "machine", lambda: "x86_64")
+    monkeypatch.setattr(smoke.sys, "version_info", (3, 13))
+    versions = {
+        "torch": "2.10.0",
+        "torchvision": "0.25.0",
+        "opencv-python-headless": "4.13.0.90",
+    }
+    monkeypatch.setattr(metadata, "version", versions.__getitem__)
+    monkeypatch.setattr(psutil, "cpu_count", lambda: 64)
+    monkeypatch.setattr(smoke.os, "sched_getaffinity", lambda pid: affinity)
+    monkeypatch.setattr(
+        psutil, "virtual_memory", lambda: SimpleNamespace(available=16 * 2**30)
+    )
+    monkeypatch.setattr(
+        smoke.shutil, "disk_usage", lambda path: SimpleNamespace(free=16 * 2**30)
+    )
+    if len(affinity) < 4:
+        with pytest.raises(RuntimeError, match=f"available_cpus={len(affinity)} < 4"):
+            smoke.headroom(tmp_path)
+    else:
+        values = smoke.headroom(tmp_path)
+        assert values["available_cpus"] == 4
+        assert values["logical_cpus"] == 64
+        assert values["cpu_affinity"] == sorted(affinity)

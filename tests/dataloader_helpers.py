@@ -87,6 +87,97 @@ class SlowImageDataset:
         ), 0
 
 
+def stalled_teardown_child(mode):
+    """Report terminal state, then keep stdout open and ignore graceful shutdown."""
+    import json
+    import os
+    import signal
+    import sys
+    import time
+
+    from imgread_benchmark.dataloader.models import EpochResult
+    from dataclasses import asdict
+
+    request = json.loads(sys.stdin.readline())
+    signal.signal(signal.SIGTERM, signal.SIG_IGN)
+
+    def emit(event, **data):
+        print(
+            json.dumps(
+                dict(
+                    event=event,
+                    protocol_version=1,
+                    config_id=request["config_id"],
+                    **data,
+                )
+            ),
+            flush=True,
+        )
+
+    if mode == "done":
+        emit("done", status="success")
+    elif mode == "run_error":
+        emit("run_error", error={"reason": "injected error"})
+    elif mode == "eof":
+        os.close(sys.stdout.fileno())
+    else:
+        status = "failed" if mode == "failed_epoch" else "success"
+        epoch = EpochResult.measured(
+            0, 1, 2, 1, 1, 0, "order", "delivered", status=status
+        )
+        emit("epoch_result", epoch=asdict(epoch), pinning={})
+    while True:
+        time.sleep(0.05)
+
+
+def teardown_caller(root, mode):
+    """Exercise production supervision with no configuration timeout or caller signal."""
+    import os
+    import signal
+    import time
+    from imgread_benchmark.dataloader import (
+        BenchmarkRunError,
+        DataLoaderConfig,
+        run_benchmark,
+        snapshot_files,
+        readers,
+        runner,
+    )
+    from imgread_benchmark.dataloader.models import ReaderInfo
+
+    original = runner.subprocess.Popen
+
+    def launch(command, *args, **kwargs):
+        assert command[1:] == ["-m", "imgread_benchmark.dataloader._child"]
+        process = original(
+            [command[0], "-m", "tests.dataloader_helpers", "stalled-child", mode],
+            *args,
+            **kwargs,
+        )
+        (root / "consumer.pid").write_text(str(process.pid))
+        return process
+
+    runner.subprocess.Popen = launch
+    readers.probe_reader = lambda reader: ReaderInfo(reader, "test", True)
+    runner._SHUTDOWN_GRACE_SECONDS = 0.2
+    runner._SHUTDOWN_TERM_SECONDS = 0.2
+    original_sigterm = signal.getsignal(signal.SIGTERM)
+    start = time.monotonic()
+    try:
+        run_benchmark(
+            snapshot_files([root / "000.png"]),
+            DataLoaderConfig(epochs=2 if mode == "failed_epoch" else 1),
+        )
+    except BenchmarkRunError as exc:
+        assert exc.result.status == "failed"
+        assert "shutdown timeout" in exc.result.error["reason"]
+        assert time.monotonic() - start < 8
+        assert not runner.group_members(int((root / "consumer.pid").read_text()))
+        assert signal.getsignal(signal.SIGTERM) == original_sigterm
+        return dict(error=exc.result.error, caller_pid=os.getpid())
+    raise AssertionError("stalled teardown was accepted")
+
+
 if __name__ == "__main__":
     import json
     import sys
@@ -96,4 +187,9 @@ if __name__ == "__main__":
 
         dataset.ImageListDataset = SlowImageDataset
         raise SystemExit(_child.main())
+    if sys.argv[1] == "stalled-child":
+        stalled_teardown_child(sys.argv[2])
+    elif sys.argv[1] == "teardown-caller":
+        print(json.dumps(teardown_caller(Path(sys.argv[2]), sys.argv[3])))
+        raise SystemExit(0)
     print(json.dumps(independent_orders(sys.argv[1], sys.argv[2])))

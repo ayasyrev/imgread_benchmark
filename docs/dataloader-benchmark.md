@@ -146,7 +146,10 @@ guarantee all batches are pinned or promise acceleration. Pinning is not GPU tra
 Private torch teardown is confined to `close_loader` for the supported version.
 The coordinator drains protocol/stdout and diagnostics/stderr throughout execution.
 Cancellation and failure trigger cleanup: 10 seconds graceful, 5 seconds TERM,
-then KILL and a final bounded check. Further runs are refused if a prior group
+then KILL and a final bounded check. The grace period begins on the final or
+failed epoch, a run error, completion, or EOF; waiting for stdout or process exit
+uses that same deadline. A stalled teardown fails even without a configuration
+timeout. Further runs are refused if a prior group
 cannot be cleaned up. Main-thread SIGTERM and Ctrl-C use the same cleanup path.
 
 ## Resource measurements

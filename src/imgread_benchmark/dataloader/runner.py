@@ -20,6 +20,9 @@ from .manifest import validate_manifest
 from .models import BenchmarkResult, BenchmarkRunError, EpochResult, digest
 
 _CLEANUP_FAILED = False
+_SHUTDOWN_GRACE_SECONDS = 10
+_SHUTDOWN_TERM_SECONDS = 5
+_SHUTDOWN_KILL_SECONDS = 2
 
 
 def group_members(group):
@@ -37,21 +40,27 @@ def group_members(group):
     return result
 
 
-def cleanup_group(process, *, cancel=False):
+def cleanup_group(process, *, cancel=False, graceful_deadline=None):
     global _CLEANUP_FAILED
+    if graceful_deadline is None:
+        graceful_deadline = time.monotonic() + _SHUTDOWN_GRACE_SECONDS
     if cancel and process.poll() is None:
         try:
             process.stdin.write(json.dumps({"event": "cancel"}) + "\n")
             process.stdin.flush()
         except (OSError, ValueError):
             pass
-    for sig, seconds in ((None, 10), (signal.SIGTERM, 5), (signal.SIGKILL, 2)):
+    for sig, seconds in (
+        (None, None),
+        (signal.SIGTERM, _SHUTDOWN_TERM_SECONDS),
+        (signal.SIGKILL, _SHUTDOWN_KILL_SECONDS),
+    ):
         if sig is not None:
             try:
                 os.killpg(process.pid, sig)
             except ProcessLookupError:
                 pass
-        deadline = time.monotonic() + seconds
+        deadline = graceful_deadline if sig is None else time.monotonic() + seconds
         while time.monotonic() < deadline:
             process.poll()
             if not group_members(process.pid):
@@ -117,6 +126,7 @@ def run_benchmark(manifest, config, *, timeout_seconds=None):
     readers = []
     done = False
     deadline = invoked_at + timeout_seconds if timeout_seconds else None
+    teardown_deadline = None
     old_sigterm = None
     if threading.current_thread() is threading.main_thread():
         old_sigterm = signal.getsignal(signal.SIGTERM)
@@ -177,11 +187,15 @@ def run_benchmark(manifest, config, *, timeout_seconds=None):
         while True:
             if deadline is not None and time.monotonic() > deadline:
                 raise TimeoutError("configuration timeout")
+            if teardown_deadline is not None and time.monotonic() > teardown_deadline:
+                raise TimeoutError("consumer shutdown timeout while waiting for EOF")
             try:
                 line = events.get(timeout=0.1)
             except queue.Empty:
                 continue
             if line is None:
+                if teardown_deadline is None:
+                    teardown_deadline = time.monotonic() + _SHUTDOWN_GRACE_SECONDS
                 break
             event = json.loads(line)
             if (
@@ -214,14 +228,32 @@ def run_benchmark(manifest, config, *, timeout_seconds=None):
             elif kind == "epoch_result":
                 result.epochs.append(EpochResult(**event["epoch"]))
                 result.pinning = event["pinning"]
+                if teardown_deadline is None and (
+                    result.epochs[-1].status != "success"
+                    or len(result.epochs) >= config.epochs
+                ):
+                    teardown_deadline = time.monotonic() + _SHUTDOWN_GRACE_SECONDS
             elif kind == "run_error":
                 result.error = event["error"]
+                if teardown_deadline is None:
+                    teardown_deadline = time.monotonic() + _SHUTDOWN_GRACE_SECONDS
             elif kind == "done":
                 done = True
                 result.status = event["status"]
+                if teardown_deadline is None:
+                    teardown_deadline = time.monotonic() + _SHUTDOWN_GRACE_SECONDS
             else:
                 raise RuntimeError(f"unknown child event {kind}")
-        if not done or process.wait(timeout=10) != 0 or result.error:
+        # EOF can precede process exit. It shares the same grace budget as
+        # terminal events and process-group cleanup, rather than resetting it.
+        exit_deadline = (
+            min(deadline, teardown_deadline) if deadline else teardown_deadline
+        )
+        try:
+            returncode = process.wait(timeout=max(0, exit_deadline - time.monotonic()))
+        except subprocess.TimeoutExpired as exc:
+            raise TimeoutError("consumer shutdown timeout after EOF") from exc
+        if not done or returncode != 0 or result.error:
             result.status = "failed"
             if result.error is None:
                 raise RuntimeError("consumer EOF/nonzero exit without successful done")
@@ -245,7 +277,9 @@ def run_benchmark(manifest, config, *, timeout_seconds=None):
             sampler.apply(result)
         if process is not None:
             try:
-                cleanup_group(process, cancel=not done)
+                cleanup_group(
+                    process, cancel=not done, graceful_deadline=teardown_deadline
+                )
             except Exception as exc:
                 result.status = "failed"
                 result.error = dict(

@@ -145,12 +145,14 @@ def headroom(root):
             raise RuntimeError(f"dependency mismatch: {package}")
     values = dict(
         logical_cpus=psutil.cpu_count(),
+        cpu_affinity=sorted(os.sched_getaffinity(0)),
         available_ram=psutil.virtual_memory().available,
         artifact_free=shutil.disk_usage(root if root.exists() else "/tmp").free,
         shm_free=shutil.disk_usage("/dev/shm").free,
     )
+    values["available_cpus"] = len(values["cpu_affinity"])
     minimums = dict(
-        logical_cpus=4,
+        available_cpus=4,
         available_ram=8 * 2**30,
         artifact_free=2 * 2**30,
         shm_free=256 * 2**20,

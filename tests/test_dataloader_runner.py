@@ -344,3 +344,89 @@ def test_warmup_error_has_reader_path_and_stage(tmp_path):
     assert caught.value.reader == "cv2-rgb"
     assert caught.value.path == str(paths[0])
     assert caught.value.stage == "warmup"
+
+
+@pytest.mark.parametrize(
+    "mode", ["done", "final_epoch", "failed_epoch", "run_error", "eof"]
+)
+def test_teardown_is_bounded_without_configuration_timeout(tmp_path, mode):
+    import json
+    import signal
+    import subprocess
+    import sys
+
+    make_images(tmp_path, 1)
+    try:
+        completed = subprocess.run(
+            [
+                sys.executable,
+                "-m",
+                "tests.dataloader_helpers",
+                "teardown-caller",
+                str(tmp_path),
+                mode,
+            ],
+            text=True,
+            capture_output=True,
+            timeout=15,
+        )
+        assert completed.returncode == 0, completed.stderr
+        assert "shutdown timeout" in json.loads(completed.stdout)["error"]["reason"]
+        assert not group_members(int((tmp_path / "consumer.pid").read_text()))
+    finally:
+        pid_file = tmp_path / "consumer.pid"
+        if pid_file.exists():
+            try:
+                os.killpg(int(pid_file.read_text()), signal.SIGKILL)
+            except ProcessLookupError:
+                pass
+
+
+@pytest.mark.parametrize("observed", [False, True])
+def test_effective_pinning_is_observed_after_timer(tmp_path, monkeypatch, observed):
+    import torch
+    from imgread_benchmark.dataloader import engine
+
+    clock_calls = []
+
+    class Batch:
+        shape = (1, 3, 224, 224)
+
+        def is_pinned(self):
+            assert len(clock_calls) == 2
+            return observed
+
+    class Loader:
+        def __init__(self, *args, **kwargs):
+            assert kwargs["pin_memory"] is True
+
+        def __iter__(self):
+            yield Batch(), 0
+
+    original = engine.consume_epoch
+
+    def consume(*args):
+        def clock():
+            clock_calls.append(None)
+            return len(clock_calls) * 10**9
+
+        return original(*args, clock=clock)
+
+    monkeypatch.setattr(torch.utils.data, "DataLoader", Loader)
+    monkeypatch.setattr(engine, "consume_epoch", consume)
+    monkeypatch.setattr(engine, "thread_policy", lambda reader: {})
+    monkeypatch.setattr(torch.accelerator, "is_available", lambda: False)
+    records = []
+    engine.execute(
+        snapshot_files(make_images(tmp_path, 1)),
+        DataLoaderConfig(epochs=1, pin_memory=True),
+        "test",
+        lambda event, **data: records.append((event, data)),
+        lambda: None,
+    )
+    pinning = next(
+        data["pinning"] for event, data in records if event == "epoch_result"
+    )
+    assert pinning["last_batch_observed"] is observed
+    assert pinning["status"] == ("observed_pinned" if observed else "observed_unpinned")
+    assert bool(pinning["warnings"]) is not observed
