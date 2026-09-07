@@ -258,6 +258,88 @@ def verify_data(qualified):
             raise RuntimeError(f"data changed: {name}")
 
 
+def ensure_no_consumers():
+    """A lost supervisor releases flock; explicitly reject its surviving processes."""
+    import psutil
+
+    survivors = []
+    for process in psutil.process_iter(["pid", "cmdline", "cwd", "status", "uids"]):
+        info = process.info
+        if (
+            not info["uids"]
+            or info["uids"].real != os.getuid()
+            or info["status"] == psutil.STATUS_ZOMBIE
+        ):
+            continue
+        args = info["cmdline"] or []
+        related = "imgread_benchmark.dataloader._child" in args or any(
+            "from multiprocessing.spawn import spawn_main" in arg
+            or "from multiprocessing.resource_tracker import main" in arg
+            for arg in args
+        )
+        if related and (
+            info["cwd"] is None or Path(info["cwd"]).resolve() == CANONICAL.resolve()
+        ):
+            survivors.append(info["pid"])
+    if survivors:
+        raise RuntimeError(
+            f"previous/active consumer group has surviving PIDs {survivors}; stop and confirm cleanup before a new attempt"
+        )
+
+
+def save_execution(output, logical_id, position, raw, result=None, error=None):
+    if result is not None:
+        write_result(result, output)
+    else:
+        private_dir(output)
+        save(
+            output / "failure.json",
+            dict(
+                stage="acceptance",
+                reader=raw["reader"],
+                path=None,
+                reason=f"{type(error).__name__}: {error}",
+            ),
+        )
+    save(
+        output / "invocation.json",
+        dict(
+            logical_id=logical_id,
+            matrix_position=position,
+            config=raw,
+            api="run_benchmark(manifest, config, timeout_seconds=60)",
+            execution_id=result.execution_id if result else None,
+            env={
+                k: os.environ.get(k)
+                for k in (
+                    "CUDA_VISIBLE_DEVICES",
+                    "OMP_NUM_THREADS",
+                    "MKL_NUM_THREADS",
+                    "OPENBLAS_NUM_THREADS",
+                )
+            },
+        ),
+    )
+    write_private(output / "stdout.txt", "")
+    write_private(
+        output / "stderr.txt", "\n".join(result.warnings) if result else str(error)
+    )
+
+
+def durable_record(kind, attempt, binding, value):
+    # Control records must remain outside both checkouts and the artifact tree.
+    if (
+        contained(RECORDS, CANONICAL)
+        or contained(RECORDS, INPUTS.parent.parent)
+        or contained(RECORDS, attempt.parent.parent)
+    ):
+        raise RuntimeError("workflow record root containment failed")
+    save(
+        RECORDS / f"{binding['code_sha']}-{attempt.name}-{kind}.json",
+        dict(**binding, attempt=str(attempt), **value),
+    )
+
+
 def run(root, binding):
     import fcntl
 
@@ -270,6 +352,7 @@ def run(root, binding):
         os.open(root / "active.lock", os.O_CREAT | os.O_RDWR, 0o600), "w"
     ) as lock:
         fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        ensure_no_consumers()
         attempt = qualified / f"attempt-{uuid.uuid4()}"
         private_dir(attempt)
         save(
@@ -288,6 +371,9 @@ def run(root, binding):
                 },
                 headroom=headroom(root),
             ),
+        )
+        durable_record(
+            "launch", attempt, binding, dict(launch_sha=sha(attempt / "launch.json"))
         )
         manifest = load_manifest(qualified / "manifest.json")
         outcome = "failed"
@@ -308,27 +394,35 @@ def run(root, binding):
                 output = attempt / f"{position:02}-{logical_id}"
                 try:
                     result = run_benchmark(manifest, cfg, timeout_seconds=60)
-                except Exception as exc:
-                    if hasattr(exc, "result"):
-                        write_result(exc.result, output)
+                except BaseException as exc:
+                    save_execution(
+                        output,
+                        logical_id,
+                        position,
+                        raw,
+                        getattr(exc, "result", None),
+                        exc,
+                    )
                     raise
-                write_result(result, output)
-                save(
-                    output / "invocation.json",
-                    dict(
-                        logical_id=logical_id,
-                        matrix_position=position,
-                        config=raw,
-                        execution_id=result.execution_id,
-                    ),
-                )
-                write_private(output / "stdout.txt", "")
-                write_private(output / "stderr.txt", "\n".join(result.warnings))
+                save_execution(output, logical_id, position, raw, result)
             outcome = "success"
         finally:
             save(
                 attempt / "outcome.json",
                 dict(status=outcome, code_sha=binding["code_sha"]),
+            )
+            durable_record(
+                "outcome",
+                attempt,
+                binding,
+                dict(
+                    status=outcome,
+                    artifact_hashes={
+                        str(p.relative_to(attempt)): sha(p)
+                        for p in attempt.rglob("*")
+                        if p.is_file()
+                    },
+                ),
             )
         print(attempt)
 
@@ -449,6 +543,12 @@ def verify(root, binding):
         },
     )
     save(attempt / "verification.json", verification)
+    durable_record(
+        "verification",
+        attempt,
+        binding,
+        dict(status="success", verification_sha=sha(attempt / "verification.json")),
+    )
     print(canonical_json(verification))
 
 

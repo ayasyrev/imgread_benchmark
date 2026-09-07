@@ -385,6 +385,7 @@ class ResourceSampler:
             "partial"
             if self.errors
             or self.baseline is None
+            or self.baseline.get("completeness") != "complete"
             or not summaries
             or any(s["status"] != "complete" for s in summaries)
             else "complete"

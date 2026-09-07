@@ -100,6 +100,7 @@ def run_benchmark(manifest, config, *, timeout_seconds=None):
         manifest,
         {"requested": asdict(config), "effective": config.effective()},
         reader=asdict(reader),
+        resource_status="partial" if config.monitor_resources else "off",
     )
     try:
         validate_manifest(manifest, config.reader)

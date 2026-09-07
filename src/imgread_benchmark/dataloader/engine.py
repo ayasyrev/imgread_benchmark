@@ -11,7 +11,7 @@ from dataclasses import asdict
 from functools import partial
 from importlib.metadata import version
 
-from .models import EpochResult, digest
+from .models import EpochResult, ImageReadError, digest
 
 
 def thread_policy(reader):
@@ -58,11 +58,14 @@ def worker_init(worker_id, *, reader, registrations):
         registrations.put(registration)
 
 
-def byte_warmup(manifest):
+def byte_warmup(manifest, reader="preflight"):
     for path in manifest.paths:
-        with open(path, "rb") as stream:
-            while stream.read(1024 * 1024):
-                pass
+        try:
+            with open(path, "rb") as stream:
+                while stream.read(1024 * 1024):
+                    pass
+        except OSError as exc:
+            raise ImageReadError(reader, path, exc, "warmup") from exc
 
 
 def close_loader(loader, iterator):
@@ -125,7 +128,7 @@ def execute(manifest, config, execution_id, emit, wait_go):
     settings = thread_policy(config.reader)
     config.validate_count(manifest.selected_n)
     if config.warmup:
-        byte_warmup(manifest)
+        byte_warmup(manifest, config.reader)
     sampler = EpochSampler(manifest.selected_n, config.seed, config.shuffle)
     registrations = relay = None
     relay_stop = threading.Event()

@@ -135,6 +135,7 @@ def test_acceptance_evaluator_checks_rates_and_identity(tmp_path, monkeypatch):
     from imgread_benchmark.dataloader.resources import reduce_observations
 
     monkeypatch.setattr(smoke, "headroom", lambda root: {})
+    monkeypatch.setattr(smoke, "durable_record", lambda *args: None)
     binding = {"code_sha": "test-sha", "input_hashes": {}}
     smoke.prepare(tmp_path, binding)
     qualified = tmp_path / "test-sha"
@@ -202,3 +203,37 @@ def test_acceptance_evaluator_checks_rates_and_identity(tmp_path, monkeypatch):
     path.write_text(json.dumps(data))
     with pytest.raises(AssertionError):
         smoke.verify(tmp_path, binding)
+
+
+def test_acceptance_rejects_orphan_and_records_failures(tmp_path, monkeypatch):
+    from types import SimpleNamespace
+
+    psutil = pytest.importorskip("psutil")
+    from tests import dataloader_smoke as smoke
+
+    process = SimpleNamespace(
+        info=dict(
+            pid=123,
+            cmdline=[
+                "python",
+                "-c",
+                "from multiprocessing.spawn import spawn_main; spawn_main()",
+            ],
+            cwd=str(smoke.CANONICAL),
+            status="sleeping",
+            uids=SimpleNamespace(real=os.getuid()),
+        )
+    )
+    monkeypatch.setattr(psutil, "process_iter", lambda *args: [process])
+    with pytest.raises(RuntimeError, match="surviving PIDs"):
+        smoke.ensure_no_consumers()
+    output = tmp_path / "failed"
+    smoke.save_execution(
+        output, "id", 0, {"reader": "pil-rgb"}, error=ValueError("dependency missing")
+    )
+    assert (
+        json.loads((output / "failure.json").read_text())["reason"]
+        == "ValueError: dependency missing"
+    )
+    assert json.loads((output / "invocation.json").read_text())["logical_id"] == "id"
+    assert (output / "stderr.txt").exists()

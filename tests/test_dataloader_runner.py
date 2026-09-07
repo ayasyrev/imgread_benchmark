@@ -309,3 +309,38 @@ def test_monitored_abba_fresh_processes(tmp_path):
             and result.baseline["sweep_end_ns"] <= result.epochs[0].start_ns
         )
         assert not group_members(result.consumer["pid"])
+
+
+def test_monitor_requested_before_consumer_start_failure(tmp_path, monkeypatch):
+    from imgread_benchmark.dataloader import readers, runner
+    from imgread_benchmark.dataloader.models import ReaderInfo
+
+    monkeypatch.setattr(
+        readers, "probe_reader", lambda reader: ReaderInfo(reader, "test", True)
+    )
+
+    def fail(*args, **kwargs):
+        raise OSError("process could not start")
+
+    monkeypatch.setattr(runner.subprocess, "Popen", fail)
+    with pytest.raises(BenchmarkRunError) as caught:
+        run_benchmark(
+            snapshot_files(make_images(tmp_path, 1)),
+            DataLoaderConfig(monitor_resources=True),
+        )
+    assert caught.value.result.resource_status == "partial"
+    assert caught.value.result.baseline is None
+
+
+def test_warmup_error_has_reader_path_and_stage(tmp_path):
+    from imgread_benchmark.dataloader.engine import byte_warmup
+    from imgread_benchmark.dataloader.models import ImageReadError
+
+    paths = make_images(tmp_path, 1)
+    manifest = snapshot_files(paths)
+    paths[0].unlink()
+    with pytest.raises(ImageReadError) as caught:
+        byte_warmup(manifest, "cv2-rgb")
+    assert caught.value.reader == "cv2-rgb"
+    assert caught.value.path == str(paths[0])
+    assert caught.value.stage == "warmup"

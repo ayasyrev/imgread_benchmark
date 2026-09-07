@@ -104,7 +104,10 @@ def dataloader(cfg: DataLoaderCLIConfig) -> None:
         result = exc.result
         exit_code = 130 if (result.error or {}).get("cancelled") else 1
     except ImageReadError as exc:
-        print(str(exc), file=sys.stderr)
+        print(
+            f"stage={exc.stage} reader={cfg.reader} path={exc.path}: {exc.reason}",
+            file=sys.stderr,
+        )
         raise SystemExit(1) from exc
     except (ValueError, ImportError) as exc:
         print(str(exc), file=sys.stderr)
