@@ -132,3 +132,22 @@ Then verify:
 ```bash
 UV_CACHE_DIR=.uv-cache uv run imgread_benchmark libs
 ```
+
+### CPU PyTorch DataLoader benchmark
+
+Compare Pillow, torchvision and two explicit OpenCV RGB paths with a common
+uint8 resize/crop pipeline and real CPU DataLoader batches:
+
+```bash
+uv sync --extra dataloader --extra monitor
+uv run --extra dataloader imgread_benchmark dataloader --list-readers
+uv run --extra dataloader imgread_benchmark dataloader tests/test_imgs --reader pil-rgb --num-workers 0 --batch-size 2 --epochs 3 --output /tmp/imgread-dataloader-example-a
+```
+
+Add `--monitor-resources` for external CPU/RSS observations and a prepared-process
+memory baseline. Use a saved `--manifest` to compare readers on the same ordered
+file list. The new `--num-workers 0` means loading in the isolated consumer;
+legacy `benchmark --nw 0` still means all CPUs. Optional dependencies preserve the
+base installation. Supported execution: Linux, Python 3.12–3.13, torch 2.10.0 and
+torchvision 0.25.0. See [the complete contract](docs/dataloader-benchmark.md) for
+flags, Python API, source image restrictions, timing and resource limitations.

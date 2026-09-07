@@ -284,3 +284,12 @@ def test_benchmark_respects_repeats(tmp_path, monkeypatch):
 
     main(["benchmark", str(tmp_path), "-r", "7"])
     assert calls["num_repeats"] == 7
+
+
+def test_dataloader_passthrough_and_flag_isolation():
+    from imgread_benchmark.cli import _BENCHMARK_FLAG_ALLOWLIST
+
+    argv = ["dataloader", "imgs", "--num-workers", "0"]
+    assert _normalize_argv(argv) == argv
+    assert "--num-workers" not in _BENCHMARK_FLAG_ALLOWLIST
+    assert "--monitor-resources" not in _BENCHMARK_FLAG_ALLOWLIST
