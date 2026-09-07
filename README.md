@@ -19,7 +19,9 @@ uv run imgread_benchmark /path/to/images [options]
 
 - `-n`, `--num_samples`: Number of images to use for the benchmark (default: 200).
 - `-t`, `--to`: Target format (`def`, `pil`, `np`).
-- `-r`, `--repeats`: Number of repeat runs for each image (default: 5).
+- `-r`, `--repeats`: Number of passes over the selected images for each library (default: 5).
+- `--shuffle`: Shuffle the selected files before every repeat of each library, including multiprocessing runs (default: off).
+- `--no-warmup`: Disable file-cache warmup (enabled by default).
 - `-l`, `--img_lib`: Test only a specific library.
 - `-x`, `--exclude`: Exclude a specific library from the test.
 - `-m`, `--multiprocessing`: Use multiprocessing for benchmarking.
@@ -27,8 +29,13 @@ uv run imgread_benchmark /path/to/images [options]
 
 Example:
 ```bash
-uv run imgread_benchmark /path/to/images -r 10 -n 100 -t np
+uv run imgread_benchmark /path/to/images -r 10 -n 100 -t np --shuffle
 ```
+
+Before the first timed benchmark, all selected files are read once in chunks to
+warm the OS file cache, without decoding or keeping the dataset in Python memory.
+Warmup and shuffling are excluded from the timings. Shuffling changes only the
+order, keeping the same selected images for every library and repeat.
 
 ## Dataset Management
 

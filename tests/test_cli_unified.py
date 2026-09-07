@@ -267,7 +267,7 @@ def test_benchmark_respects_repeats(tmp_path, monkeypatch):
     calls = {}
 
     class DummyBench:
-        def __init__(self, filenames, target_format, num_repeats):
+        def __init__(self, filenames, target_format, num_repeats, **kwargs):
             self.func_dict = {"PIL": lambda _path: None}
             calls["num_repeats"] = num_repeats
 
@@ -284,3 +284,80 @@ def test_benchmark_respects_repeats(tmp_path, monkeypatch):
 
     main(["benchmark", str(tmp_path), "-r", "7"])
     assert calls["num_repeats"] == 7
+
+
+@pytest.mark.parametrize("flag", ["--shuffle", "--no-warmup"])
+def test_normalize_argv_injects_benchmark_with_file_options(flag):
+    assert _normalize_argv([flag, "/imgs"]) == ["benchmark", flag, "/imgs"]
+
+
+@pytest.mark.parametrize("explicit_command", [False, True])
+@pytest.mark.parametrize(
+    "flags, shuffle, warmup",
+    [
+        ([], False, True),
+        (["--shuffle"], True, True),
+        (["--no-warmup"], False, False),
+        (["--shuffle", "--no-warmup"], True, False),
+    ],
+)
+def test_benchmark_file_options(
+    tmp_path, monkeypatch, explicit_command, flags, shuffle, warmup
+):
+    calls = {}
+
+    class DummyBench:
+        def __init__(self, **kwargs):
+            calls.update(kwargs)
+
+        def run(self, **kwargs):
+            calls["run"] = True
+
+    monkeypatch.setattr("imgread_benchmark.benchmark.BenchmarkImgRead", DummyBench)
+    monkeypatch.setattr(
+        "imgread_benchmark.get_img_filenames.get_img_filenames",
+        lambda *args, **kwargs: ["img1.jpg"],
+    )
+    from imgread_benchmark.cli import main
+
+    command = ["benchmark"] if explicit_command else []
+    main([*command, *flags, str(tmp_path)])
+    assert calls["shuffle"] is shuffle
+    assert calls["warmup"] is warmup
+    assert calls["run"]
+
+
+@pytest.mark.parametrize("multiprocessing", [False, True])
+def test_warmup_error_is_not_reported_as_worker_error(
+    tmp_path, monkeypatch, capsys, multiprocessing
+):
+    from imgread_benchmark.benchmark import FileWarmupError
+
+    class DummyBench:
+        def __init__(self, **kwargs):
+            self.func_dict = {"PIL": lambda path: None}
+
+        def run(self, **kwargs):
+            raise FileWarmupError("Failed to warm up 'unreadable.jpg': access denied")
+
+    monkeypatch.setattr("imgread_benchmark.benchmark.BenchmarkImgRead", DummyBench)
+    monkeypatch.setattr(
+        "imgread_benchmark.get_img_filenames.get_img_filenames",
+        lambda *args, **kwargs: ["unreadable.jpg"],
+    )
+    monkeypatch.setattr(
+        "imgread_benchmark.cli._get_multiprocessing_compat_errors",
+        lambda *args: [],
+    )
+    monkeypatch.setattr(
+        "imgread_benchmark.cli._probe_multiprocessing_workers", lambda *args: None
+    )
+    args = ["benchmark", str(tmp_path)]
+    if multiprocessing:
+        args.append("--multiprocessing")
+    with pytest.raises(SystemExit) as exc:
+        _build_cli()(args)
+    assert exc.value.code == 1
+    stderr = capsys.readouterr().err
+    assert "Failed to warm up 'unreadable.jpg'" in stderr
+    assert "workers" not in stderr

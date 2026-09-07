@@ -3,7 +3,7 @@ import sys
 from argparsecfg.app import app
 from dataclasses import dataclass
 from .argparse_compat import field_argument
-from .benchmark import BenchmarkImgRead
+from .benchmark import BenchmarkImgRead, FileWarmupError
 from .get_img_filenames import get_img_filenames
 
 
@@ -41,6 +41,18 @@ class AppConfig:
         help="use multiprocessing, default=False",
     )
     nw: int = field_argument(default=None, help="num workers, if 0 -> use all cpus")
+    shuffle: bool = field_argument(
+        "--shuffle",
+        default=False,
+        action="store_true",
+        help="Shuffle files before every repeat of each image reader",
+    )
+    no_warmup: bool = field_argument(
+        flag="--no-warmup",
+        default=False,
+        action="store_true",
+        help="Skip reading all selected files before the first timed benchmark",
+    )
 
 
 @app(
@@ -70,13 +82,19 @@ def benchmark(
     bench = BenchmarkImgRead(
         filenames=filenames,
         target_format=cfg.to,
+        shuffle=cfg.shuffle,
+        warmup=not cfg.no_warmup,
     )
-    bench.run(
-        func_name=cfg.img_lib,
-        exclude=cfg.exclude,
-        multiprocessing=cfg.multiprocessing,
-        num_workers=cfg.nw,
-    )
+    try:
+        bench.run(
+            func_name=cfg.img_lib,
+            exclude=cfg.exclude,
+            multiprocessing=cfg.multiprocessing,
+            num_workers=cfg.nw,
+        )
+    except FileWarmupError as exc:
+        print(f"Error: {exc}", file=sys.stderr)
+        raise SystemExit(1) from exc
 
 
 if __name__ == "__main__":  # pragma: no cover
