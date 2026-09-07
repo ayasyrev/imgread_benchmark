@@ -254,3 +254,58 @@ except BenchmarkRunError as exc:
                     child.kill()
                 except psutil.NoSuchProcess:
                     pass
+
+
+@pytest.mark.parametrize("workers", [0, 2])
+def test_real_monitor_slow_dataset(tmp_path, monkeypatch, workers):
+    import subprocess
+
+    original = subprocess.Popen
+
+    def launch(command, *args, **kwargs):
+        if command[1:] == ["-m", "imgread_benchmark.dataloader._child"]:
+            command = [command[0], "-m", "tests.dataloader_helpers", "slow-child"]
+        return original(command, *args, **kwargs)
+
+    monkeypatch.setattr(subprocess, "Popen", launch)
+    config = DataLoaderConfig(
+        num_workers=workers,
+        monitor_resources=True,
+        epochs=1,
+        batch_size=2,
+        sample_interval_ms=50,
+    )
+    result = run_benchmark(snapshot_files(make_images(tmp_path, 10)), config)
+    resources = result.epochs[0].resources
+    assert resources["sample_count"] >= 2
+    assert resources["complete_process_interval_count"] >= 1
+    assert resources["cpu_mean_percent"] is not None
+    assert resources["rss"]["total"]["observed_peak_mib"] > 0
+    observed = {p["role"] for s in result.resource_samples for p in s["processes"]}
+    assert "consumer" in observed
+    if workers:
+        assert "worker" in observed
+    assert not group_members(result.consumer["pid"])
+
+
+def test_monitored_abba_fresh_processes(tmp_path):
+    manifest = snapshot_files(make_images(tmp_path, 2))
+    a = DataLoaderConfig(epochs=1, monitor_resources=True)
+    b = DataLoaderConfig(
+        reader="cv2-bgr-cvtcolor",
+        num_workers=2,
+        persistent_workers=True,
+        epochs=1,
+        monitor_resources=True,
+    )
+    results = [run_benchmark(manifest, config) for config in (a, b, b, a)]
+    identities = {(r.consumer["pid"], r.consumer["os_create_time"]) for r in results}
+    assert len(identities) == 4
+    assert len({r.execution_id for r in results}) == 4
+    assert len({r.config_id for r in results}) == 2
+    for result in results:
+        assert (
+            result.baseline
+            and result.baseline["sweep_end_ns"] <= result.epochs[0].start_ns
+        )
+        assert not group_members(result.consumer["pid"])

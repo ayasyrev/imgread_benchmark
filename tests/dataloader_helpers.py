@@ -67,8 +67,33 @@ def independent_orders(root, reader):
     return orders
 
 
+class SlowImageDataset:
+    """Only test consumers sleep; production iteration has no delay hook."""
+
+    def __init__(self, manifest, reader_id, geometry=True):
+        self.manifest, self.reader_id, self.geometry = manifest, reader_id, geometry
+
+    def __len__(self):
+        return self.manifest.selected_n
+
+    def __getitem__(self, index):
+        import time
+        from imgread_benchmark.dataloader.dataset import ImageTransform
+        from imgread_benchmark.dataloader.readers import get_reader
+
+        time.sleep(0.15)
+        return ImageTransform(self.geometry)(
+            get_reader(self.reader_id)(self.manifest.paths[index])
+        ), 0
+
+
 if __name__ == "__main__":
     import json
     import sys
 
+    if sys.argv[1] == "slow-child":
+        from imgread_benchmark.dataloader import dataset, _child
+
+        dataset.ImageListDataset = SlowImageDataset
+        raise SystemExit(_child.main())
     print(json.dumps(independent_orders(sys.argv[1], sys.argv[2])))
