@@ -155,6 +155,14 @@ Read/iteration failures are published before teardown. Their reader/path context
 remains the primary error if shutdown also fails; later errors are retained in
 `error.secondary_errors`.
 
+The final table and exported `delivery_summary` explicitly mark incomplete
+reading for the selected reader. They show selected entries per epoch, confirmed
+batch deliveries versus the planned total, completed epochs, and intentional
+`drop_last` exclusions separately. A missing epoch report contributes no confirmed
+deliveries; that does not prove that its workers read zero files. Prefetch and
+partial batches mean the exact unread-file count cannot be inferred from delivered
+batches. Failed-epoch rates remain N/A, and the report shows captured warnings.
+
 ## Resource measurements
 
 Monitoring is off by default: no sampler, psutil import, registration queue or

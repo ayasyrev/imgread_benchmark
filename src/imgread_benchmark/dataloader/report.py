@@ -5,6 +5,7 @@ import os
 from pathlib import Path
 
 from rich.table import Table
+from rich.text import Text
 
 from .models import BenchmarkResult, canonical_json
 
@@ -65,7 +66,7 @@ def _number(value):
 def render_result(result):
     config = result.config["effective"]
     title = f"{config['reader']} · {result.status} · workers={config['num_workers']} batch={config['batch_size']} · {result.config_id[:12]}"
-    table = Table(title=title)
+    table = Table(title=Text(title))
     columns = [
         "Epoch",
         "Status",
@@ -109,13 +110,25 @@ def render_result(result):
                 resource.get("status", "partial"),
             ]
         table.add_row(*row)
-    caption = f"Late epoch median: {_number(result.late_epoch_seconds_median)} s. Pin requested={config['pin_memory']}, observed={result.pinning.get('status', 'not_observed')}."
+    delivery = result.delivery_summary
+    caption = (
+        f"Reading: {delivery['status']}; reader={delivery['reader']}. "
+        f"Confirmed batch deliveries: {delivery['confirmed_deliveries']}/{delivery['expected_deliveries']}; "
+        f"selected entries/epoch={delivery['selected_entries_per_epoch']}; "
+        f"successful epochs={delivery['successful_epochs']}/{delivery['planned_epochs']}; "
+        f"intentional drop_last/epoch={delivery['intentional_drop_last_per_epoch']}.\n"
+    )
+    if delivery["warning"]:
+        caption += delivery["warning"] + "\n"
+    caption += f"Late epoch median: {_number(result.late_epoch_seconds_median)} s. Pin requested={config['pin_memory']}, observed={result.pinning.get('status', 'not_observed')}."
     if monitored:
         from .resources import METHOD
 
         baseline = (result.baseline or {}).get("totals", {}).get("total_rss_bytes")
         caption += f" Baseline RSS: {_number(baseline / 2**20 if baseline is not None else None)} MiB. Interval: {config['sample_interval_ms']} ms; resources={result.resource_status}. {METHOD}."
     if result.error:
-        caption += f" Error: {result.error}"
-    table.caption = caption
+        caption += f"\nError: {result.error}"
+    for warning in result.warnings:
+        caption += f"\nWarning: {warning}"
+    table.caption = Text(caption)
     return table

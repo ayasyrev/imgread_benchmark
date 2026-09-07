@@ -269,11 +269,49 @@ class BenchmarkResult:
         ]
         return median(values) if values else None
 
+    @property
+    def delivery_summary(self):
+        """Confirmed batch deliveries, not a guess at worker-prefetched reads."""
+        config = self.config["effective"]
+        selected = self.manifest.selected_n
+        dropped = selected % config["batch_size"] if config["drop_last"] else 0
+        per_epoch = selected - dropped
+        planned = per_epoch * config["epochs"]
+        confirmed = sum(epoch.images_delivered for epoch in self.epochs)
+        complete = len(self.epochs) == config["epochs"] and all(
+            epoch.status == "success" and epoch.images_delivered == per_epoch
+            for epoch in self.epochs
+        )
+        warning = None
+        if not complete:
+            warning = (
+                f"INCOMPLETE READING: reader={config['reader']}; "
+                f"confirmed batch deliveries {confirmed}/{planned} across "
+                f"{config['epochs']} planned epochs. "
+                "Unconfirmed deliveries are not an exact count of unread files: "
+                "workers may have prefetched images, and an interrupted epoch "
+                "may not have reported its counts. Failed-epoch rates are N/A."
+            )
+        return dict(
+            reader=config["reader"],
+            status="complete" if complete else "incomplete",
+            selected_entries_per_epoch=selected,
+            planned_epochs=config["epochs"],
+            reported_epochs=len(self.epochs),
+            successful_epochs=sum(epoch.status == "success" for epoch in self.epochs),
+            intentional_drop_last_per_epoch=dropped,
+            expected_deliveries=planned,
+            confirmed_deliveries=confirmed,
+            unconfirmed_deliveries=max(0, planned - confirmed),
+            warning=warning,
+        )
+
     def to_dict(self):
         return {
             **asdict(self),
             "manifest": self.manifest.to_dict(),
             "late_epoch_seconds_median": self.late_epoch_seconds_median,
+            "delivery_summary": self.delivery_summary,
         }
 
     @classmethod
@@ -282,6 +320,7 @@ class BenchmarkResult:
         if value.get("schema_version") != 1:
             raise ValueError("Unsupported result schema_version")
         value.pop("late_epoch_seconds_median", None)
+        value.pop("delivery_summary", None)
         value["manifest"] = FileManifest.from_dict(value["manifest"])
         value["epochs"] = [EpochResult(**e) for e in value["epochs"]]
         return cls(**value)

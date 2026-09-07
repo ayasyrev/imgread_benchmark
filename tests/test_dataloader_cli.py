@@ -38,6 +38,99 @@ def test_export_roundtrip(tmp_path):
     assert table.columns[6]._cells == ["200"]
 
 
+def test_incomplete_reading_report_and_export(tmp_path):
+    from io import StringIO
+    from rich.console import Console
+
+    manifest = snapshot_files(make_images(tmp_path / "imgs"))
+    config = DataLoaderConfig(epochs=2, batch_size=4)
+    result = BenchmarkResult(
+        "id",
+        "uuid",
+        manifest,
+        {"requested": config.effective(), "effective": config.effective()},
+        epochs=[
+            EpochResult.measured(0, 0, 2_000_000_000, 10, 3, 0, "a", "a"),
+            EpochResult.measured(
+                1, 2_000_000_000, 3_000_000_000, 4, 1, 0, "b", "c", status="failed"
+            ),
+        ],
+        error={
+            "reader": "pil-rgb",
+            "path": "/images/[red].png",
+            "reason": "bad payload",
+            "secondary_errors": [{"reason": "shutdown timeout"}],
+        },
+        warnings=["decoder diagnostic"],
+    )
+    summary = result.delivery_summary
+    assert summary["status"] == "incomplete"
+    assert summary["confirmed_deliveries"] == 14
+    assert summary["expected_deliveries"] == 20
+    assert summary["unconfirmed_deliveries"] == 6
+    assert summary["selected_entries_per_epoch"] == 10
+    assert summary["successful_epochs"] == 1
+    stream = StringIO()
+    Console(file=stream, width=240, color_system=None).print(render_result(result))
+    text = " ".join(stream.getvalue().split())
+    for expected in (
+        "INCOMPLETE READING",
+        "reader=pil-rgb",
+        "14/20",
+        "N/A",
+        "/images/[red].png",
+        "bad payload",
+        "shutdown timeout",
+        "Warning: decoder diagnostic",
+    ):
+        assert expected in text
+    output = tmp_path / "report"
+    write_result(result, output)
+    assert read_result(output).to_dict() == result.to_dict()
+    assert (
+        json.loads((output / "result.json").read_text())["delivery_summary"] == summary
+    )
+
+
+@pytest.mark.parametrize("teardown_failed", [False, True])
+def test_completed_reads_and_drop_last_are_not_incomplete(tmp_path, teardown_failed):
+    config = DataLoaderConfig(epochs=2, batch_size=4, drop_last=True)
+    result = BenchmarkResult(
+        "id",
+        "uuid",
+        snapshot_files(make_images(tmp_path)),
+        {"requested": config.effective(), "effective": config.effective()},
+        status="failed" if teardown_failed else "success",
+        error={"reason": "shutdown timeout"} if teardown_failed else None,
+        epochs=[
+            EpochResult.measured(i, 0, 1_000_000_000, 8, 2, 2, "a", "b")
+            for i in range(2)
+        ],
+    )
+    summary = result.delivery_summary
+    assert summary["status"] == "complete"
+    assert summary["intentional_drop_last_per_epoch"] == 2
+    assert summary["confirmed_deliveries"] == summary["expected_deliveries"] == 16
+    assert summary["unconfirmed_deliveries"] == 0
+    assert "INCOMPLETE" not in render_result(result).caption.plain
+
+
+def test_unreported_epoch_does_not_claim_zero_reads(tmp_path):
+    config = DataLoaderConfig(epochs=1, batch_size=4)
+    result = BenchmarkResult(
+        "id",
+        "uuid",
+        snapshot_files(make_images(tmp_path)),
+        {"requested": config.effective(), "effective": config.effective()},
+        error={"reason": "consumer crashed before reporting the epoch"},
+    )
+    summary = result.delivery_summary
+    assert summary["reported_epochs"] == 0
+    assert summary["confirmed_deliveries"] == 0
+    assert summary["unconfirmed_deliveries"] == 10
+    assert "not an exact count of unread files" in summary["warning"]
+
+
 @pytest.mark.parametrize(
     "args",
     [
