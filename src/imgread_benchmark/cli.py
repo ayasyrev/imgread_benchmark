@@ -23,6 +23,8 @@ _BENCHMARK_FLAG_ALLOWLIST = {
     "--nw",
     "-r",
     "--repeats",
+    "--shuffle",
+    "--no-warmup",
 }
 
 _ROOT_ONLY_FLAGS = {"-h", "--help", "-V", "--version"}
@@ -267,6 +269,18 @@ def _build_cli() -> App:
             default=5,
             help="Number of repeat runs, default 5",
         )
+        shuffle: bool = field_argument(
+            "--shuffle",
+            default=False,
+            action="store_true",
+            help="Shuffle files before every repeat of each image reader",
+        )
+        no_warmup: bool = field_argument(
+            flag="--no-warmup",
+            default=False,
+            action="store_true",
+            help="Skip reading all selected files before the first timed benchmark",
+        )
 
     def benchmark(cfg: BenchmarkConfig) -> None:
         from pathlib import Path as StdLibPath
@@ -288,10 +302,14 @@ def _build_cli() -> App:
             print(f"Error: No images found in '{cfg.img_path}'!", file=_sys.stderr)
             raise SystemExit(1)
 
-        from .benchmark import BenchmarkImgRead
+        from .benchmark import BenchmarkImgRead, FileWarmupError
 
         bench = BenchmarkImgRead(
-            filenames=filenames, target_format=cfg.to, num_repeats=cfg.repeats
+            filenames=filenames,
+            target_format=cfg.to,
+            num_repeats=cfg.repeats,
+            shuffle=cfg.shuffle,
+            warmup=not cfg.no_warmup,
         )
         if cfg.multiprocessing:
             compat_errors = _get_multiprocessing_compat_errors(
@@ -338,6 +356,9 @@ def _build_cli() -> App:
                 multiprocessing=cfg.multiprocessing,
                 num_workers=num_workers,
             )
+        except FileWarmupError as exc:
+            print(f"Error: {exc}", file=_sys.stderr)
+            raise SystemExit(1) from exc
         except (PermissionError, RuntimeError, OSError) as exc:
             if not cfg.multiprocessing:
                 raise
