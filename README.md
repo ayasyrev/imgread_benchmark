@@ -139,3 +139,46 @@ Then verify:
 ```bash
 UV_CACHE_DIR=.uv-cache uv run imgread_benchmark libs
 ```
+
+### CPU PyTorch DataLoader benchmark
+
+Compare Pillow, torchvision, two explicit OpenCV RGB paths and optional imgread with a common
+uint8 resize/crop pipeline and real CPU DataLoader batches:
+
+```bash
+uv sync --extra dataloader --extra monitor
+uv run --extra dataloader imgread_benchmark dataloader --list-readers
+uv run --extra dataloader imgread_benchmark dataloader tests/test_imgs --reader pil-rgb --num-workers 0 --batch-size 2 --epochs 3 --output /tmp/imgread-dataloader-example-a
+```
+
+Add `--monitor-resources` for external CPU/RSS observations and a prepared-process
+memory baseline. Use a saved `--manifest` to compare readers on the same ordered
+file list. The new `--num-workers 0` means loading in the isolated consumer;
+legacy `benchmark --nw 0` still means all CPUs. Optional dependencies preserve the
+base installation. Supported execution: Linux, Python 3.12–3.13, torch 2.10.0 and
+torchvision 0.25.0. Run `uv run --extra dataloader imgread_benchmark dataloader --help`
+for the available options.
+
+Use `--storage memory` to preload compressed bytes before timing and decode each
+sample from RAM in the same Dataset. Add `--no-geometry` to omit resize/crop;
+native sizes may require `--batch-size 1`. `--reader imgread-rgb` supports both
+files and memory; `--reader imgread-loader-rgb` reuses one `imgread.Loader` per
+process, calling the Loader for files and `Loader.decode(data)` for memory.
+Memory mode requires an imgread build providing `Loader.decode`; PyPI 0.2.0
+does not include it. Install a wheel from a compatible imgread build into the
+benchmark environment. With worker processes, use `--persistent-workers` to
+retain their Loader state between epochs. The encoded cache contains immutable
+`bytes`; each access decodes a fresh RGB uint8 image.
+
+With that build installed, use `--no-sync` to keep uv from replacing it with the
+version pinned in `uv.lock`:
+
+```bash
+uv run --no-sync imgread_benchmark dataloader --list-readers --storage memory
+uv run --no-sync imgread_benchmark dataloader /path/to/images --reader imgread-loader-rgb --storage memory --num-workers 2 --persistent-workers --epochs 3 --output /tmp/imgread-loader-memory
+```
+
+Both the `imgread` and `img_libs` extras install `imgread>=0.2.0` and register
+it with the ordinary file benchmark (`-l imgread`). The published 0.2.0 release
+supports the functional `imgread-rgb` reader with files and encoded bytes.
+The persistent reader checks for the required Loader API before starting a run.

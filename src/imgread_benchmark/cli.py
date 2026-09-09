@@ -5,7 +5,7 @@ from typing import Callable, Sequence, Union
 from argparsecfg.app import App
 from .argparse_compat import field_argument
 
-_KNOWN_COMMANDS = {"benchmark", "libs", "data"}
+_KNOWN_COMMANDS = {"benchmark", "libs", "data", "dataloader"}
 
 _BENCHMARK_FLAG_ALLOWLIST = {
     "-n",
@@ -366,6 +366,9 @@ def _build_cli() -> App:
             raise SystemExit(2) from exc
 
     cli.command(benchmark)
+    from .dataloader.cli import dataloader
+
+    cli.command(dataloader)
     return cli
 
 

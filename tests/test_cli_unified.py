@@ -286,6 +286,15 @@ def test_benchmark_respects_repeats(tmp_path, monkeypatch):
     assert calls["num_repeats"] == 7
 
 
+def test_dataloader_passthrough_and_flag_isolation():
+    from imgread_benchmark.cli import _BENCHMARK_FLAG_ALLOWLIST
+
+    argv = ["dataloader", "imgs", "--num-workers", "0"]
+    assert _normalize_argv(argv) == argv
+    assert "--num-workers" not in _BENCHMARK_FLAG_ALLOWLIST
+    assert "--monitor-resources" not in _BENCHMARK_FLAG_ALLOWLIST
+
+
 @pytest.mark.parametrize("flag", ["--shuffle", "--no-warmup"])
 def test_normalize_argv_injects_benchmark_with_file_options(flag):
     assert _normalize_argv([flag, "/imgs"]) == ["benchmark", flag, "/imgs"]

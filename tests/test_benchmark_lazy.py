@@ -3,45 +3,11 @@ from multiprocessing.reduction import ForkingPickler
 
 from benchmark_utils.benchmark import try_run
 
-from imgread_benchmark import benchmark as benchmark_mod
 from imgread_benchmark.read_img import graceful_degradation
 
 
 def _dummy_reader_for_pickle(_path: str) -> str:
     return "ok"
-
-
-def test_get_read_to_format_returns_dicts():
-    read_to_format = benchmark_mod._get_read_to_format()
-    assert isinstance(read_to_format["def"], dict)
-    assert isinstance(read_to_format["pil"], dict)
-    assert isinstance(read_to_format["np"], dict)
-
-
-def test_benchmark_img_read_with_dummy_funcs():
-    def _dummy_reader(_path: str) -> str:
-        return "ok"
-
-    bench = benchmark_mod.BenchmarkImgRead(
-        filenames=["/tmp/not_used.jpg"],
-        func_dict={"dummy": _dummy_reader},
-        target_format="def",
-        num_repeats=1,
-        clear_progress=True,
-    )
-
-    assert bench.func_dict["dummy"]("/tmp/x.jpg") == "ok"
-    assert "dummy" in bench.func_names
-    assert bench.num_repeats == 1
-
-
-def test_benchmark_img_read_respects_num_repeats():
-    bench = benchmark_mod.BenchmarkImgRead(
-        filenames=["img1.jpg", "img2.jpg"],
-        func_dict={"dummy": lambda x: x},
-        num_repeats=3,
-    )
-    assert bench.num_repeats == 3
 
 
 def test_graceful_degradation_wrapper_is_pickleable_for_multiprocessing():

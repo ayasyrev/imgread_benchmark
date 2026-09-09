@@ -33,6 +33,9 @@ Homepage = "https://github.com/ayasyrev/imgread_benchmark"
 imgread_benchmark = "imgread_benchmark.cli:main"
 
 [project.optional-dependencies]
+dataloader = ["torch==2.10.0", "torchvision==0.25.0", "opencv-python-headless==4.13.0.90"]
+monitor = ["psutil>=7.2,<8"]
+imgread = ["imgread>=0.2.0"]
 dev = [
     "black",
     "black[jupyter]",
@@ -41,7 +44,6 @@ dev = [
     "isort",
     "mypy",
     "nbmetaclean",
-    "nox",
     "pre-commit",
     "ruff",
     "torchvision",
@@ -51,6 +53,7 @@ test = [
     "pytest-cov",
 ]
 img_libs = [
+    "imgread>=0.2.0",
     "imageio",
     "jpeg4py",
     "kornia",
@@ -68,3 +71,10 @@ packages = [
     "accimage",
     "imread",
 ]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
+[tool.ruff.lint]
+# Preserve the rules used by the Ruff 0.14 pre-commit hook across releases.
+select = ["E4", "E7", "E9", "F"]
