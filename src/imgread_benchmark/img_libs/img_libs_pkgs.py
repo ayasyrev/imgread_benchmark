@@ -28,6 +28,7 @@ _CORE_BUILTIN_LIB_TO_PACKAGE = {
 }
 
 _ADDITIONAL_LIB_TO_PACKAGE = {
+    "imgread": "imgread",
     # Optional non-core backends that should be appended after core built-ins.
     "local_rs": "local_rs",
     "imgread_rs": "imgread-rs",

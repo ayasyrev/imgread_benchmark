@@ -1,10 +1,16 @@
+from pathlib import Path
 from typing import Literal
 
-import kornia as K
+import kornia_rs
 import numpy as np
 import torch
 from kornia import io
 from PIL import Image
+
+try:
+    from kornia.image.utils import image_to_tensor, tensor_to_image
+except ImportError:  # Kornia < 0.8.3
+    from kornia.utils import image_to_tensor, tensor_to_image
 
 __all__ = [
     "read_img",
@@ -23,6 +29,14 @@ def read_img(
     Returns:
         torch.Tensor: Image as torch.Tensor
     """
+    if (
+        load_type == io.ImageLoadType.RGB8
+        and Path(img_path).suffix.lower() in {".jpg", ".jpeg"}
+        and not hasattr(kornia_rs, "read_image_jpegturbo")
+    ):
+        # kornia_rs 0.1.14 moved JPEG I/O; Kornia 0.8.3 still calls the old name.
+        array = kornia_rs.io.read_image_jpegturbo(str(img_path))
+        return image_to_tensor(array, keepdim=True).to(device=device)
     return io.load_image(img_path, desired_type=load_type, device=device)
 
 
@@ -32,7 +46,7 @@ def read_img_ndarray(img_path: str) -> np.ndarray:
     Returns:
         np.ndarray: Image as numpy array with shape (width, height, channels)
     """
-    return K.utils.tensor_to_image(read_img(img_path))
+    return tensor_to_image(read_img(img_path))
 
 
 def read_img_pil(img_path: str) -> Image.Image:

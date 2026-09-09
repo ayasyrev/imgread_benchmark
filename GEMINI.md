@@ -8,7 +8,7 @@ A Python benchmarking tool for comparing the performance of various image readin
 - **Build System:** `uv_build`
 - **Package Manager:** `uv`
 - **Execution:** ALWAYS use `uv run` for executing python and running tests (e.g., `uv run python ...`, `uv run pytest ...`).
-- **Testing Framework:** `pytest`, `nox`
+- **Testing Framework:** `pytest`
 - **Core Dependencies:** `benchmark_utils`, `argparsecfg`, `rich`, `pillow`, `numpy`
 
 ## Getting Started
@@ -54,14 +54,6 @@ Run tests directly using `pytest` via `uv` for fast feedback.
 uv run pytest
 ```
 
-**Pre-release Verification:**
-Use `nox` to run tests across all supported Python versions (3.12 - 3.13) before releasing.
-
-```bash
-# Run all sessions
-nox
-```
-
 ### Benchmarking Logic
 
 The core logic resides in `src/imgread_benchmark/benchmark.py`.
@@ -76,7 +68,6 @@ The core logic resides in `src/imgread_benchmark/benchmark.py`.
   - `cl_app.py`: Legacy benchmark CLI (deprecated, use `cli.py` instead).
   - `cl_versions.py`: Legacy versions CLI (deprecated, use `cli.py` instead).
   - `tests/`: Pytest suite.
-  - `noxfile.py`: Automation definitions for testing.
 
 ## Key Configuration Files
 
