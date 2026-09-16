@@ -169,6 +169,19 @@ def test_monitor_off_does_not_import_psutil(tmp_path, monkeypatch):
     )
     manifest = snapshot_files(make_images(tmp_path, 1))
     assert run_benchmark(manifest, DataLoaderConfig(epochs=1)).resource_status == "off"
+    from imgread_benchmark.dataloader import runner
+
+    original_popen = runner.subprocess.Popen
+
+    def launch(command, *args, **kwargs):
+        assert command[-1] == "imgread_benchmark.dataloader._preflight"
+        return original_popen(
+            [command[0], "-m", "tests.dataloader_helpers", "preflight-no-monitor"],
+            *args,
+            **kwargs,
+        )
+
+    monkeypatch.setattr(runner.subprocess, "Popen", launch)
     with pytest.raises(ValueError, match="psutil blocked"):
         run_benchmark(manifest, DataLoaderConfig(epochs=1, monitor_resources=True))
 

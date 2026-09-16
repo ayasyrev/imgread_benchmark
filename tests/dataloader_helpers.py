@@ -45,9 +45,12 @@ class SlowImageDataset:
         from imgread_benchmark.dataloader.readers import get_reader
 
         time.sleep(0.15)
-        return ImageTransform(self.geometry)(
-            get_reader(self.reader_id)(self.manifest.paths[index])
-        ), 0
+        return (
+            ImageTransform(self.geometry)(
+                get_reader(self.reader_id)(self.manifest.paths[index])
+            ),
+            0,
+        )
 
 
 def stalled_teardown_child(mode):
@@ -119,7 +122,8 @@ def teardown_caller(root, mode):
     original = runner.subprocess.Popen
 
     def launch(command, *args, **kwargs):
-        assert command[1:] == ["-m", "imgread_benchmark.dataloader._child"]
+        if command[1:] != ["-m", "imgread_benchmark.dataloader._child"]:
+            return original(command, *args, **kwargs)
         process = original(
             [command[0], "-m", "tests.dataloader_helpers", "stalled-child", mode],
             *args,
@@ -156,6 +160,24 @@ def teardown_caller(root, mode):
 if __name__ == "__main__":
     import json
     import sys
+
+    if sys.argv[1] == "preflight-missing-loader":
+        from imgread_benchmark.dataloader import readers, _preflight
+
+        def missing(reader, storage):
+            assert reader == "imgread-loader-rgb" and storage == "memory"
+            raise ValueError("missing required API Loader.decode")
+
+        readers.check_runtime = missing
+        raise SystemExit(_preflight.main())
+    if sys.argv[1] == "preflight-no-monitor":
+        from imgread_benchmark.dataloader import resources, _preflight
+
+        def missing_monitor():
+            raise ValueError("psutil blocked")
+
+        resources.preflight_monitor = missing_monitor
+        raise SystemExit(_preflight.main())
 
     if sys.argv[1] == "slow-child":
         from imgread_benchmark.dataloader import dataset, _child

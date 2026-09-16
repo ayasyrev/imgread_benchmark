@@ -63,9 +63,7 @@ def classify_sample(sample, registrations, expected_workers):
         process["role"] = (
             "worker"
             if identity(process) in roots
-            else "descendant"
-            if current in roots
-            else "excluded_unknown"
+            else "descendant" if current in roots else "excluded_unknown"
         )
     included = [
         p for p in processes if p["role"] in ("consumer", "worker", "descendant")
@@ -198,11 +196,11 @@ def reduce_observations(samples, epochs, registrations=(), expected_workers=0):
                 included=contained and percent is not None,
                 cpu_percent=percent,
                 process_deltas=deltas,
-                completeness="missing"
-                if percent is None
-                else "partial"
-                if reasons
-                else "complete",
+                completeness=(
+                    "missing"
+                    if percent is None
+                    else "partial" if reasons else "complete"
+                ),
                 reasons=sorted(set(reasons)),
             )
         )
@@ -235,23 +233,25 @@ def reduce_observations(samples, epochs, registrations=(), expected_workers=0):
         summaries.append(
             dict(
                 method=METHOD,
-                status="complete"
-                if observations
-                and valid
-                and not partial_samples
-                and not partial_intervals
-                else "partial",
-                cpu_mean_percent=sum(
-                    i["cpu_percent"] * i["interval_seconds"] for i in valid
-                )
-                / duration
-                if duration
-                else None,
+                status=(
+                    "complete"
+                    if observations
+                    and valid
+                    and not partial_samples
+                    and not partial_intervals
+                    else "partial"
+                ),
+                cpu_mean_percent=(
+                    sum(i["cpu_percent"] * i["interval_seconds"] for i in valid)
+                    / duration
+                    if duration
+                    else None
+                ),
                 cpu_max_percent=max((i["cpu_percent"] for i in valid), default=None),
                 cpu_interval_seconds=duration,
-                cpu_time_coverage=duration / epoch.epoch_seconds
-                if epoch.epoch_seconds > 0
-                else None,
+                cpu_time_coverage=(
+                    duration / epoch.epoch_seconds if epoch.epoch_seconds > 0 else None
+                ),
                 complete_process_interval_count=len(valid) - partial_intervals,
                 partial_process_interval_count=partial_intervals,
                 sample_count=len(observations),
@@ -343,15 +343,18 @@ class ResourceSampler:
             reasons=[],
         )
 
-    def start(self):
-        try:
-            self.baseline = classify_sample(self.sweep(), (), 0)
-            self.baseline["method"] = METHOD
-        except Exception as exc:
-            self.errors.append(f"baseline: {type(exc).__name__}: {exc}")
-            return
+    def start(self, timeout=None):
+        prepared = threading.Event()
 
         def poll():
+            try:
+                self.baseline = classify_sample(self.sweep(), (), 0)
+                self.baseline["method"] = METHOD
+            except Exception as exc:
+                self.errors.append(f"baseline: {type(exc).__name__}: {exc}")
+                return
+            finally:
+                prepared.set()
             while not self._stop.is_set():
                 try:
                     self.samples.append(self.sweep())
@@ -363,6 +366,9 @@ class ResourceSampler:
 
         self._thread = threading.Thread(target=poll, daemon=True)
         self._thread.start()
+        if not prepared.wait(timeout=timeout):
+            self._stop.set()
+            raise TimeoutError("configuration timeout during monitor startup")
 
     def stop(self):
         self._stop.set()
@@ -370,6 +376,7 @@ class ResourceSampler:
             self._thread.join(timeout=2)
             if self._thread.is_alive():
                 self.errors.append("sampler stop timeout")
+                raise RuntimeError("sampler thread did not stop")
 
     def apply(self, result):
         samples, intervals, summaries = reduce_observations(

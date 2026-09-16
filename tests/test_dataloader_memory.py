@@ -309,19 +309,19 @@ def test_missing_decode_rejected_only_for_memory(monkeypatch, capsys, decode):
 
 
 def test_memory_capability_checked_before_consumer_start(tmp_path, monkeypatch):
-    from imgread_benchmark.dataloader import readers, runner
-    from imgread_benchmark.dataloader.models import ReaderInfo
+    from imgread_benchmark.dataloader import runner
 
-    def probe(reader, storage):
-        assert reader == "imgread-loader-rgb" and storage == "memory"
-        return ReaderInfo(reader, "test", False, "missing required API Loader.decode")
+    original = runner.subprocess.Popen
 
-    monkeypatch.setattr(readers, "probe_reader", probe)
-    monkeypatch.setattr(
-        runner.subprocess,
-        "Popen",
-        lambda *a, **kw: pytest.fail("unsupported reader started a consumer"),
-    )
+    def launch(command, *args, **kwargs):
+        assert command[1:] == ["-m", "imgread_benchmark.dataloader._preflight"]
+        return original(
+            [command[0], "-m", "tests.dataloader_helpers", "preflight-missing-loader"],
+            *args,
+            **kwargs,
+        )
+
+    monkeypatch.setattr(runner.subprocess, "Popen", launch)
     with pytest.raises(ValueError, match="Loader.decode"):
         run_benchmark(
             snapshot_files(make_images(tmp_path, 1)),

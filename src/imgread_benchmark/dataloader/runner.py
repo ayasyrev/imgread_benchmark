@@ -12,11 +12,10 @@ import sys
 import threading
 import time
 import uuid
-from collections import deque
 from dataclasses import asdict
 from pathlib import Path
 
-from .manifest import validate_manifest
+from ._transport import Deadline, JsonTransport
 from .models import BenchmarkResult, BenchmarkRunError, EpochResult, digest
 
 _CLEANUP_FAILED = False
@@ -46,9 +45,9 @@ def cleanup_group(process, *, cancel=False, graceful_deadline=None):
         graceful_deadline = time.monotonic() + _SHUTDOWN_GRACE_SECONDS
     if cancel and process.poll() is None:
         try:
-            process.stdin.write(json.dumps({"event": "cancel"}) + "\n")
-            process.stdin.flush()
-        except (OSError, ValueError):
+            # A full request pipe must never block cancellation.
+            os.kill(process.pid, signal.SIGINT)
+        except ProcessLookupError:
             pass
     for sig, seconds in (
         (None, None),
@@ -73,7 +72,90 @@ def cleanup_group(process, *, cancel=False, graceful_deadline=None):
     )
 
 
+def _environment():
+    return {
+        **os.environ,
+        "OMP_NUM_THREADS": "1",
+        "MKL_NUM_THREADS": "1",
+        "OPENBLAS_NUM_THREADS": "1",
+    }
+
+
+def _run_preflight(manifest, config, deadline, result):
+    global _CLEANUP_FAILED
+    deadline.remaining("preflight")
+    process = subprocess.Popen(
+        [sys.executable, "-m", "imgread_benchmark.dataloader._preflight"],
+        stdin=subprocess.PIPE,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+        bufsize=1,
+        start_new_session=True,
+        env=_environment(),
+    )
+    transport = JsonTransport(process)
+    stage, response, finished = "preflight", None, False
+    # Retain a finite probe limit even for runs without a total budget.
+    probe_deadline = Deadline(
+        min(deadline.expires or float("inf"), time.monotonic() + 30)
+    )
+    try:
+        transport.send_factory(
+            lambda: dict(manifest=manifest.to_dict(), config=asdict(config))
+        )
+        while True:
+            try:
+                line = transport.receive(probe_deadline, stage)
+            except queue.Empty:
+                continue
+            if line is None:
+                break
+            event = json.loads(line)
+            if event["kind"] == "phase":
+                stage = event["stage"]
+            else:
+                response = event
+        process.wait(timeout=probe_deadline.remaining(stage))
+        finished = True
+        if response is None:
+            raise RuntimeError("preflight exited without a result")
+        if response["kind"] == "configuration_error":
+            raise ValueError(response["reason"])
+        if response["kind"] == "error":
+            result.error = response["error"]
+            raise BenchmarkRunError(result)
+        if response["kind"] != "ready" or process.returncode:
+            raise RuntimeError("invalid preflight result")
+        result.reader = response["reader"]
+        deadline.remaining(stage)
+    except BaseException as exc:
+        if result.error is None:
+            result.error = dict(
+                stage=getattr(exc, "stage", stage),
+                reader=config.reader,
+                path=None,
+                reason=f"{type(exc).__name__}: {exc}",
+                cancelled=isinstance(exc, KeyboardInterrupt),
+            )
+        raise
+    finally:
+        try:
+            cleanup_group(process, cancel=not finished)
+            transport.close()
+        except Exception as exc:
+            _CLEANUP_FAILED = True
+            if result.error is None:
+                raise
+            result.error.setdefault("secondary_errors", []).append(
+                dict(stage="cleanup", reason=str(exc))
+            )
+        if transport.stderr:
+            result.warnings.append("".join(transport.stderr))
+
+
 def run_benchmark(manifest, config, *, timeout_seconds=None):
+    global _CLEANUP_FAILED
     invoked_at = time.monotonic()
     if _CLEANUP_FAILED:
         raise RuntimeError(
@@ -88,17 +170,6 @@ def run_benchmark(manifest, config, *, timeout_seconds=None):
         not math.isfinite(timeout_seconds) or timeout_seconds <= 0
     ):
         raise ValueError("timeout_seconds must be positive")
-    from .readers import probe_reader
-
-    reader = probe_reader(config.reader, config.storage)
-    if not reader.available:
-        raise ValueError(f"reader={config.reader}: {reader.reason}")
-    sampler_class = None
-    if config.monitor_resources:
-        from .resources import ResourceSampler, preflight_monitor
-
-        preflight_monitor()
-        sampler_class = ResourceSampler
     execution_id = str(uuid.uuid4())
     config_id = digest(
         dict(config=config.effective(), selection_id=manifest.selection_id)
@@ -108,26 +179,15 @@ def run_benchmark(manifest, config, *, timeout_seconds=None):
         execution_id,
         manifest,
         {"requested": asdict(config), "effective": config.effective()},
-        reader=asdict(reader),
         resource_status="partial" if config.monitor_resources else "off",
     )
-    try:
-        validate_manifest(manifest, config.reader)
-    except ValueError as exc:
-        result.error = dict(
-            stage="preflight",
-            reader=config.reader,
-            path=getattr(exc, "path", None),
-            reason=str(exc),
-        )
-        raise BenchmarkRunError(result) from exc
-    events, stderr = queue.Queue(), deque(maxlen=1024)
-    process = sampler = None
-    readers = []
+    process = sampler = transport = None
     done = False
-    deadline = invoked_at + timeout_seconds if timeout_seconds else None
+    deadline = Deadline(invoked_at + timeout_seconds if timeout_seconds else None)
     teardown_deadline = None
     old_sigterm = None
+    stage = "preflight"
+    configuration_error = None
 
     def record_error(error):
         if result.error is None:
@@ -145,24 +205,14 @@ def run_benchmark(manifest, config, *, timeout_seconds=None):
 
         signal.signal(signal.SIGTERM, cancel_on_sigterm)
 
-    def drain(stream, kind):
-        try:
-            for line in stream:
-                if kind == "stderr":
-                    stderr.append(line)
-                else:
-                    events.put(line)
-        finally:
-            if kind == "stdout":
-                events.put(None)
-
     try:
-        environment = {
-            **os.environ,
-            "OMP_NUM_THREADS": "1",
-            "MKL_NUM_THREADS": "1",
-            "OPENBLAS_NUM_THREADS": "1",
-        }
+        try:
+            _run_preflight(manifest, config, deadline, result)
+        except ValueError as exc:
+            configuration_error = exc
+            raise
+        stage = "consumer startup"
+        deadline.remaining(stage)
         process = subprocess.Popen(
             [sys.executable, "-m", "imgread_benchmark.dataloader._child"],
             stdin=subprocess.PIPE,
@@ -172,34 +222,26 @@ def run_benchmark(manifest, config, *, timeout_seconds=None):
             bufsize=1,
             start_new_session=True,
             cwd=".",
-            env=environment,
+            env=_environment(),
         )
-        for stream, kind in ((process.stdout, "stdout"), (process.stderr, "stderr")):
-            thread = threading.Thread(target=drain, args=(stream, kind), daemon=True)
-            thread.start()
-            readers.append(thread)
-        process.stdin.write(
-            json.dumps(
-                dict(
-                    protocol_version=1,
-                    event="run_request",
-                    config_id=config_id,
-                    execution_id=execution_id,
-                    manifest=manifest.to_dict(),
-                    config=asdict(config),
-                ),
-                allow_nan=False,
+        transport = JsonTransport(process)
+        transport.send_factory(
+            lambda: dict(
+                protocol_version=1,
+                event="run_request",
+                config_id=config_id,
+                execution_id=execution_id,
+                manifest=manifest.to_dict(),
+                config=asdict(config),
             )
-            + "\n"
         )
-        process.stdin.flush()
+        stage = "consumer preparation"
         while True:
-            if deadline is not None and time.monotonic() > deadline:
-                raise TimeoutError("configuration timeout")
+            deadline.remaining(stage)
             if teardown_deadline is not None and time.monotonic() > teardown_deadline:
                 raise TimeoutError("consumer shutdown timeout while waiting for EOF")
             try:
-                line = events.get(timeout=0.1)
+                line = transport.receive(deadline, stage)
             except queue.Empty:
                 continue
             if line is None:
@@ -218,19 +260,21 @@ def run_benchmark(manifest, config, *, timeout_seconds=None):
                     raise RuntimeError("duplicate ready")
                 for key in ("reader", "environment", "consumer", "preparation"):
                     setattr(result, key, event[key])
-                if sampler_class is not None:
-                    sampler = sampler_class(
+                if config.monitor_resources:
+                    stage = "monitor startup"
+                    from .resources import ResourceSampler
+
+                    sampler = ResourceSampler(
                         result.consumer,
                         config.sample_interval_ms / 1000,
                         config_id,
                         config.num_workers,
                     )
-                    sampler.start()
+                    sampler.start(timeout=deadline.remaining("monitor startup"))
                     result.baseline = sampler.baseline
-                process.stdin.write(
-                    json.dumps(dict(event="go", config_id=config_id)) + "\n"
-                )
-                process.stdin.flush()
+                deadline.remaining("epoch startup")
+                transport.send(dict(event="go", config_id=config_id))
+                stage = "epochs"
             elif kind == "worker_started":
                 if sampler is not None:
                     sampler.register(event)
@@ -256,7 +300,9 @@ def run_benchmark(manifest, config, *, timeout_seconds=None):
         # EOF can precede process exit. It shares the same grace budget as
         # terminal events and process-group cleanup, rather than resetting it.
         exit_deadline = (
-            min(deadline, teardown_deadline) if deadline else teardown_deadline
+            min(deadline.expires, teardown_deadline)
+            if deadline.expires
+            else teardown_deadline
         )
         try:
             returncode = process.wait(timeout=max(0, exit_deadline - time.monotonic()))
@@ -275,7 +321,7 @@ def run_benchmark(manifest, config, *, timeout_seconds=None):
         result.status = "failed"
         record_error(
             dict(
-                stage="coordinator",
+                stage=getattr(exc, "stage", stage),
                 reader=config.reader,
                 path=None,
                 reason=f"{type(exc).__name__}: {exc}",
@@ -284,14 +330,21 @@ def run_benchmark(manifest, config, *, timeout_seconds=None):
         )
     finally:
         if sampler is not None:
-            sampler.stop()
-            sampler.apply(result)
+            try:
+                sampler.stop()
+                sampler.apply(result)
+            except Exception as exc:
+                result.status = "failed"
+                _CLEANUP_FAILED = True
+                record_error(dict(stage="monitor cleanup", reason=str(exc)))
         if process is not None:
+            process_clean = True
             try:
                 cleanup_group(
                     process, cancel=not done, graceful_deadline=teardown_deadline
                 )
             except Exception as exc:
+                process_clean = False
                 result.status = "failed"
                 record_error(
                     dict(
@@ -301,14 +354,19 @@ def run_benchmark(manifest, config, *, timeout_seconds=None):
                         reason=str(exc),
                     )
                 )
-            for thread in readers:
-                thread.join(timeout=2)
-            for stream in (process.stdin, process.stdout, process.stderr):
-                stream.close()
-        if stderr:
-            result.warnings.append("".join(stderr))
+            if transport is not None and process_clean:
+                try:
+                    transport.close()
+                except Exception as exc:
+                    _CLEANUP_FAILED = True
+                    record_error(dict(stage="cleanup", reason=str(exc)))
+                    result.status = "failed"
+                if transport.stderr:
+                    result.warnings.append("".join(transport.stderr))
         if old_sigterm is not None:
             signal.signal(signal.SIGTERM, old_sigterm)
+    if configuration_error is not None:
+        raise configuration_error
     if result.status != "success":
         raise BenchmarkRunError(result)
     return result
