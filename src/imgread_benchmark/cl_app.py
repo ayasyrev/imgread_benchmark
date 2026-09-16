@@ -53,6 +53,18 @@ class AppConfig:
         action="store_true",
         help="Skip reading all selected files before the first timed benchmark",
     )
+    decode_only: bool = field_argument(
+        flag="--decode-only",
+        default=False,
+        action="store_true",
+        help="Decode buffers from a reusable Linux tmpfs cache",
+    )
+    cache_dir: str = field_argument(
+        flag="--cache-dir", default=None, help="Private tmpfs cache directory"
+    )
+    cache_limit: str = field_argument(
+        flag="--cache-limit", default=None, help="Encoded cache limit, default 2GiB"
+    )
 
 
 @app(
@@ -62,6 +74,13 @@ def benchmark(
     cfg: AppConfig,
 ) -> None:
     """Benchmark read image functions."""
+    if not cfg.decode_only and (
+        cfg.cache_dir is not None or cfg.cache_limit is not None
+    ):
+        print(
+            "Error: --cache-dir/--cache-limit require --decode-only.", file=sys.stderr
+        )
+        raise SystemExit(2)
     if not Path(cfg.img_path).exists():
         print(f"Img dir {cfg.img_path} dos not exist!")
         raise sys.exit()
@@ -79,22 +98,35 @@ def benchmark(
     else:
         print(f"{len(filenames)} images.")
 
-    bench = BenchmarkImgRead(
-        filenames=filenames,
-        target_format=cfg.to,
-        shuffle=cfg.shuffle,
-        warmup=not cfg.no_warmup,
-    )
     try:
+        decode_options = (
+            dict(
+                decode_only=True,
+                cache_dir=cfg.cache_dir,
+                cache_limit=2147483648 if cfg.cache_limit is None else cfg.cache_limit,
+            )
+            if cfg.decode_only
+            else {}
+        )
+        bench = BenchmarkImgRead(
+            filenames=filenames,
+            target_format=cfg.to,
+            shuffle=cfg.shuffle,
+            warmup=not cfg.no_warmup,
+            **decode_options,
+        )
         bench.run(
             func_name=cfg.img_lib,
             exclude=cfg.exclude,
             multiprocessing=cfg.multiprocessing,
             num_workers=cfg.nw,
         )
-    except FileWarmupError as exc:
+    except (FileWarmupError, RuntimeError, OSError) as exc:
         print(f"Error: {exc}", file=sys.stderr)
         raise SystemExit(1) from exc
+    except ValueError as exc:
+        print(f"Error: {exc}", file=sys.stderr)
+        raise SystemExit(2) from exc
 
 
 if __name__ == "__main__":  # pragma: no cover

@@ -46,12 +46,33 @@ class BenchmarkImgRead(BenchmarkIter):
         clear_progress: bool = False,
         shuffle: bool = False,
         warmup: bool = True,
+        *,
+        decode_only: bool = False,
+        cache_dir: Optional[str] = None,
+        cache_limit: Union[int, str] = 2147483648,
     ):
         self._target_format = target_format
         self.shuffle = shuffle
         self.warmup = warmup
         self._previous_order: Optional[List[str]] = None
-        func_to_test = func_dict or _get_read_to_format()[target_format]
+        self.decode_only = decode_only
+        self.cache_dir = cache_dir
+        self.cache_limit = cache_limit
+        self.decode_report = {}
+        self.unsupported_decoders = {}
+        if decode_only:
+            from .encoded_cache import parse_cache_limit
+            from .read_img import get_decode_functions
+
+            self.cache_limit = parse_cache_limit(cache_limit)
+            registry, self.unsupported_decoders = get_decode_functions(target_format)
+            func_to_test = registry if func_dict is None else func_dict
+            self._run = self._run_decode
+            self.run = self._run_decode_selected
+        else:
+            if cache_dir is not None or cache_limit != 2147483648:
+                raise ValueError("cache_dir/cache_limit require decode_only=True")
+            func_to_test = func_dict or _get_read_to_format()[target_format]
         img_path = img_path or "."
         if filenames is None:
             filenames = get_img_filenames(img_path, num_samples=num_samples)
@@ -61,6 +82,81 @@ class BenchmarkImgRead(BenchmarkIter):
             num_repeats=num_repeats,
             clear_progress=clear_progress,
         )
+
+    def _run_decode_selected(
+        self,
+        func_name=None,
+        exclude=None,
+        num_repeats=None,
+        num_samples=None,
+        multiprocessing=None,
+        num_workers=None,
+    ):
+        names = [func_name] if isinstance(func_name, str) else func_name
+        excluded = [exclude] if isinstance(exclude, str) else (exclude or [])
+        if names is not None:
+            for name in names:
+                if name not in self.func_dict:
+                    reason = self.unsupported_decoders.get(
+                        name, "unknown or unavailable reader"
+                    )
+                    raise ValueError(f"{name}: {reason}")
+        selected = [
+            name
+            for name in (names if names is not None else self.func_dict)
+            if name not in excluded
+        ]
+        self._num_samples, self._multiprocessing, self._num_workers = (
+            num_samples,
+            multiprocessing,
+            num_workers,
+        )
+        try:
+            self._run_decode(selected, num_repeats)
+        finally:
+            self._num_samples = self._multiprocessing = self._num_workers = None
+
+    def _run_decode(self, func_names, num_repeats=None):
+        from .decode_benchmark import DecodeRunError, run_decode
+        from .read_img import get_read_img_version
+
+        self._reset_results()
+        self.decode_report = {}
+        if self._num_samples is not None and (
+            type(self._num_samples) is not int or self._num_samples < 0
+        ):
+            raise ValueError("num_samples must be nonnegative")
+        filenames = self.item_list[: self._num_samples or len(self.item_list)]
+        versions = get_read_img_version()
+        for name in func_names:
+            print(f"Decoder: {name} {versions.get(name, 'custom/unknown')}")
+        for name, reason in self.unsupported_decoders.items():
+            if name not in self.func_dict:
+                print(f"Skipped: {name}: {reason}")
+        self._results, errors, metadata = run_decode(
+            {name: self.func_dict[name] for name in func_names},
+            filenames,
+            cache_dir=self.cache_dir,
+            cache_limit=self.cache_limit,
+            num_repeats=self.num_repeats if num_repeats is None else num_repeats,
+            shuffle=self.shuffle,
+            warmup=self.warmup,
+            multiprocessing=bool(self._multiprocessing),
+            num_workers=self._num_workers,
+        )
+        self.decode_report = {
+            **metadata,
+            "target_format": self.target_format,
+            "versions": {
+                name: versions.get(name, "custom/unknown") for name in func_names
+            },
+            "errors": errors,
+            "seconds": self._results,
+        }
+        if self._results:
+            self.print_results_per_item()
+        if errors:
+            raise DecodeRunError(errors)
 
     def _run(
         self,
@@ -125,6 +221,14 @@ class BenchmarkImgRead(BenchmarkIter):
 
     @target_format.setter
     def target_format(self, target_format: Literal["def", "pil", "np"]) -> None:
+        if self.decode_only:
+            from .read_img import get_decode_functions
+
+            self.func_dict, self.unsupported_decoders = get_decode_functions(
+                target_format
+            )
+            self._target_format = target_format
+            return
         read_to_format = _get_read_to_format()
         if target_format not in read_to_format:
             print(f"{target_format} not in available format.")

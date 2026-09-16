@@ -1,6 +1,9 @@
 # imgread_benchmark
 Benchmark for read images with different libs.
 
+Requires Python 3.12 or 3.13. The ordinary file benchmark is portable;
+DataLoader execution and the encoded tmpfs cache are qualified on Linux.
+
 ## List Available Image Libraries
 
 ```bash
@@ -36,6 +39,58 @@ Before the first timed benchmark, all selected files are read once in chunks to
 warm the OS file cache, without decoding or keeping the dataset in Python memory.
 Warmup and shuffling are excluded from the timings. Shuffling changes only the
 order, keeping the same selected images for every library and repeat.
+
+### Decode encoded buffers from memory
+
+`--decode-only` measures decoding through each library's buffer adapter:
+
+```bash
+uv run imgread_benchmark /path/to/images --decode-only -l PIL -t np -r 3
+uv run imgread_benchmark /path/to/images --decode-only -l imgread -t np -m --nw 2
+uv run imgread_benchmark --decode-only --cache-limit 4GiB /path/to/images -A
+```
+
+- `--cache-dir` defaults to `/dev/shm/imgread_benchmark-<uid>`. It must be on
+  Linux tmpfs, owned by the current user, with private permissions (`0700`).
+- `--cache-limit` limits the total allocated data/index space under that root
+  (default `2GiB`; positive bytes, `KiB`, `MiB`, or `GiB`). Inactive caches are
+  evicted by last use; active process leases prevent eviction.
+- The immutable cache contains compressed source bytes in `data.bin` and a
+  versioned `index.json`. Full and subset requests reuse a matching cache after
+  checking source paths, sizes, and modification/change timestamps. A cache hit
+  does not reread source contents. Cache files persist after the benchmark.
+- New caches are copied incrementally and published atomically. Preparation
+  checks tmpfs free space, available RAM and cgroup memory headroom, retaining
+  a reserve of at least 512 MiB or 10% of the effective memory limit.
+- Mapping, page prefault, a decoder initialization probe, and the default full
+  decode warmup happen before timing. `--no-warmup` skips the full warmup only;
+  `--shuffle` rearranges indices outside each timed repeat.
+- Sequential timing includes decoder calls, buffer/format conversions and result
+  disposal. Multiprocessing uses persistent spawn workers per backend, with an
+  independent mapping and lease in each worker. Timed throughput includes task
+  dispatch and status synchronization; image payloads are not sent through IPC.
+- Output identifies preparation time, cache hit/build, path, size, evictions,
+  selected count, workers, warmup/shuffle policy and decoder versions. Python
+  users can inspect the same metadata and failures in `benchmark.decode_report`.
+- A failed backend has no reported speed. Other backends may finish, but the CLI
+  exits nonzero (the Python API raises `DecodeRunError`). Unsupported buffer
+  adapters are listed as skipped; explicitly selecting one is an error.
+
+No resize or normalization is added. Each backend keeps its file adapter's
+`def`/`pil`/`np` semantics. Buffer copies required by a library count toward its
+time; this mode does not promise zero-copy decoding or pinned RAM. tmpfs may swap.
+Worker startup and lack of progress each have a 120-second bound, followed by
+bounded graceful/terminate/kill cleanup (10/5/2 seconds).
+
+```python
+from imgread_benchmark import BenchmarkImgRead
+
+bench = BenchmarkImgRead(filenames=selected_paths, target_format="np",
+                         decode_only=True, cache_limit="2GiB", num_repeats=3)
+bench.run(func_name=["PIL", "cv2", "imgread"], multiprocessing=True, num_workers=2)
+print(bench.results)        # average seconds per complete pass
+print(bench.decode_report)  # metadata, per-pass seconds and errors
+```
 
 ## Dataset Management
 
@@ -122,6 +177,10 @@ Notes:
 - For `-t np`, backend should provide `read_img_ndarray`.
 - If plugin name conflicts with a built-in backend name, built-in backend wins.
 - Built-in backends are listed first; additional and plugin backends are appended.
+- Decode-only plugins expose optional `decode_img`, `decode_img_pil` and
+  `decode_img_ndarray`. They accept a contiguous read-only `memoryview`, return
+  a decoded independent image and never retain the input or open a source path.
+  Errors must propagate. Spawn mode requires importable, pickleable callables.
 
 ## Install Local Rust/PyO3 Backend
 
@@ -164,21 +223,26 @@ sample from RAM in the same Dataset. Add `--no-geometry` to omit resize/crop;
 native sizes may require `--batch-size 1`. `--reader imgread-rgb` supports both
 files and memory; `--reader imgread-loader-rgb` reuses one `imgread.Loader` per
 process, calling the Loader for files and `Loader.decode(data)` for memory.
-Memory mode requires an imgread build providing `Loader.decode`; PyPI 0.2.0
-does not include it. Install a wheel from a compatible imgread build into the
-benchmark environment. With worker processes, use `--persistent-workers` to
+The published `imgread>=0.2.1` provides this API. With worker processes, use `--persistent-workers` to
 retain their Loader state between epochs. The encoded cache contains immutable
 `bytes`; each access decodes a fresh RGB uint8 image.
 
-With that build installed, use `--no-sync` to keep uv from replacing it with the
-version pinned in `uv.lock`:
+Install the optional dependencies and run:
 
 ```bash
-uv run --no-sync imgread_benchmark dataloader --list-readers --storage memory
-uv run --no-sync imgread_benchmark dataloader /path/to/images --reader imgread-loader-rgb --storage memory --num-workers 2 --persistent-workers --epochs 3 --output /tmp/imgread-loader-memory
+uv sync --extra dataloader --extra imgread
+uv run --extra dataloader --extra imgread imgread_benchmark dataloader --list-readers --storage memory
+uv run --extra dataloader --extra imgread imgread_benchmark dataloader /path/to/images --reader imgread-loader-rgb --storage memory --num-workers 2 --persistent-workers --epochs 3 --output /tmp/imgread-loader-memory
 ```
 
-Both the `imgread` and `img_libs` extras install `imgread>=0.2.0` and register
-it with the ordinary file benchmark (`-l imgread`). The published 0.2.0 release
-supports the functional `imgread-rgb` reader with files and encoded bytes.
+Both the `imgread` and `img_libs` extras install `imgread>=0.2.1` and register
+it with the ordinary file and decode-only benchmarks (`-l imgread`).
 The persistent reader checks for the required Loader API before starting a run.
+
+The Python `run_benchmark(..., timeout_seconds=...)` budget starts at function
+entry and covers isolated dependency/manifest preflight, consumer preparation,
+monitor startup and epochs. No consumer is started after the preflight budget
+expires. Timeout raises `BenchmarkRunError` with a structured partial result and
+the failing stage; invalid configuration still raises `ValueError`. Process
+cleanup has a separate finite budget. Calls made earlier to `snapshot_files` or
+`discover_manifest` are outside this budget. Calls from Python threads are supported.

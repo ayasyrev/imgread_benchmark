@@ -428,24 +428,24 @@ wheels = [
 
 [[package]]
 name = "imgread"
-version = "0.2.0"
+version = "0.2.1"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "numpy" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/2c/1d/74a37f5b5527302d430f968ad6fdee614377d773755e8e7faaed9efc3c1f/imgread-0.2.0.tar.gz", hash = "sha256:90a4d77b9223fe839cf51548252b31514a88e7c37ce7d47dd623c93cc82b615f", size = 123826, upload-time = "2026-09-07T15:25:41.949Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/f3/85/9e31eb8f48cb2120fa1188ce2e5e4486a660de164480b744a49aae0c1c1f/imgread-0.2.1.tar.gz", hash = "sha256:511dff2bc1bb4ca4cec9b632322d45fad4c2fd70118dc8771b8c5840e6e8ce94", size = 139316, upload-time = "2026-09-16T10:33:34.305Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/1d/b2/f9579d4e09e5974ef1e38c4650b0c70133af5f6c2d8fd92f207639f9f7fe/imgread-0.2.0-cp312-cp312-macosx_10_13_x86_64.whl", hash = "sha256:a7da36f8df5c883ae30f7facf33ea50bdfa1d9f500ddb1ae24654decc8a25812", size = 1212041, upload-time = "2026-09-07T15:25:21.711Z" },
-    { url = "https://files.pythonhosted.org/packages/73/6e/bbedbbb38ba45131b51b3f6e122e52a820304b4f4f4c80aa91ba8f9f5664/imgread-0.2.0-cp312-cp312-macosx_11_0_arm64.whl", hash = "sha256:4c3e30dff7b639f61e8a672e2638a2785da3339442bb8557bed219b962c34947", size = 1142948, upload-time = "2026-09-07T15:25:24.638Z" },
-    { url = "https://files.pythonhosted.org/packages/f6/34/454d48e396c59c8fbd5315889457b3c613c37d69765f7266ac3ea61dc4b1/imgread-0.2.0-cp312-cp312-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:e21b647f71b1be8959194d44d4a698576d87cc0a81dc411f0bfbd2bf661b13c0", size = 1291665, upload-time = "2026-09-07T15:25:27.289Z" },
-    { url = "https://files.pythonhosted.org/packages/80/79/f21f89220eaa3c2d3ded4c86c196bc8d590dca9a70bec9c31996ffbf49c3/imgread-0.2.0-cp313-cp313-macosx_10_13_x86_64.whl", hash = "sha256:048f5db7a7281c69768c89ba34e4190cdecc35d8d5062eb9263d9f6d5d676325", size = 1212136, upload-time = "2026-09-07T15:25:29.565Z" },
-    { url = "https://files.pythonhosted.org/packages/50/25/089ad12c9681ebec9f3352a88ca184e8031d1d08fd158b9050844f0f898d/imgread-0.2.0-cp313-cp313-macosx_11_0_arm64.whl", hash = "sha256:e64f5c44d9f80fff26fa9f963c4955e5f65d62f65387ae6e4dbb48da4f8f3a3b", size = 1143279, upload-time = "2026-09-07T15:25:31.716Z" },
-    { url = "https://files.pythonhosted.org/packages/90/9d/0bbbb0565a319361e0101536abe0d98887e29251f070fedef89c9298ec1d/imgread-0.2.0-cp313-cp313-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:25c352df09f68357dafbe6347bb9a788cd53b8d6f2d350eef9fda9a451a0e471", size = 1291541, upload-time = "2026-09-07T15:25:33.633Z" },
+    { url = "https://files.pythonhosted.org/packages/26/d6/b359ce2a2c40124785b890fa56a3fc36fde301b39365e79d07f6030901df/imgread-0.2.1-cp312-cp312-macosx_10_13_x86_64.whl", hash = "sha256:2a61959a44bb9e85253866f0042be4f9345294f004c5b440b49f9b567f793cd1", size = 1231838, upload-time = "2026-09-16T10:33:19.682Z" },
+    { url = "https://files.pythonhosted.org/packages/68/58/15ea8bea29bc034b93f11232c38d9ecce96b2fe3b335ae0e5e60940be18b/imgread-0.2.1-cp312-cp312-macosx_11_0_arm64.whl", hash = "sha256:56e27a1b121fb5589f492cc6da1ea4ba91220bebf273ac1da29a9077ffe683cb", size = 1159586, upload-time = "2026-09-16T10:33:21.226Z" },
+    { url = "https://files.pythonhosted.org/packages/b9/9b/8e01b1d0222660022ae49225e5be16b282c110db2ea7202edfc99390ff05/imgread-0.2.1-cp312-cp312-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:201ac78575c300f7e22fe0c2230796c0b38cd02813e6b4cfbf01ed84b0fd2bb9", size = 1322302, upload-time = "2026-09-16T10:33:22.811Z" },
+    { url = "https://files.pythonhosted.org/packages/e1/e8/abaca91e3a3530c258d79cc8f3e5d54007c13bf75914d2c5783c0a15fcd3/imgread-0.2.1-cp313-cp313-macosx_10_13_x86_64.whl", hash = "sha256:cfab04de20cbcbd02c5da95f6f07f1527d5b5300884178eee7de11662f9ce751", size = 1230911, upload-time = "2026-09-16T10:33:24.365Z" },
+    { url = "https://files.pythonhosted.org/packages/59/95/ea452497bbeecbacc90a3f21a35c8d6cf9444f370eb5e6dd67756721bed7/imgread-0.2.1-cp313-cp313-macosx_11_0_arm64.whl", hash = "sha256:cdae5c364db5371944a8b2a1cd762ede4c8ad867e25f1b5cd1b150fa3cf582e9", size = 1159562, upload-time = "2026-09-16T10:33:25.885Z" },
+    { url = "https://files.pythonhosted.org/packages/3f/6b/deb7ad8cd3c3c82f5e047f60271b8aa1db6b76dadb49e1844d741a34db48/imgread-0.2.1-cp313-cp313-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:662e6d163bb045ea9c8f67671847005dc804e614e46496aa05b6acdef582fc5e", size = 1322089, upload-time = "2026-09-16T10:33:27.492Z" },
 ]
 
 [[package]]
 name = "imgread-benchmark"
-version = "0.3.2.dev2"
+version = "0.3.2"
 source = { editable = "." }
 dependencies = [
     { name = "argparsecfg" },
@@ -508,8 +508,8 @@ requires-dist = [
     { name = "flake8", marker = "extra == 'dev'" },
     { name = "imagecodecs", marker = "extra == 'img-libs'" },
     { name = "imageio", marker = "extra == 'img-libs'" },
-    { name = "imgread", marker = "extra == 'img-libs'", specifier = ">=0.2.0" },
-    { name = "imgread", marker = "extra == 'imgread'", specifier = ">=0.2.0" },
+    { name = "imgread", marker = "extra == 'img-libs'", specifier = ">=0.2.1" },
+    { name = "imgread", marker = "extra == 'imgread'", specifier = ">=0.2.1" },
     { name = "isort", marker = "extra == 'dev'" },
     { name = "jpeg4py", marker = "extra == 'img-libs'" },
     { name = "kornia", marker = "extra == 'img-libs'" },

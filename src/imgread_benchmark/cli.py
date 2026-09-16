@@ -25,11 +25,16 @@ _BENCHMARK_FLAG_ALLOWLIST = {
     "--repeats",
     "--shuffle",
     "--no-warmup",
+    "--decode-only",
+    "--cache-dir",
+    "--cache-limit",
 }
 
 _ROOT_ONLY_FLAGS = {"-h", "--help", "-V", "--version"}
 
 _FLAGS_WITH_VALUES = {
+    "--cache-dir",
+    "--cache-limit",
     "-n",
     "--num_samples",
     "-t",
@@ -281,12 +286,43 @@ def _build_cli() -> App:
             action="store_true",
             help="Skip reading all selected files before the first timed benchmark",
         )
+        decode_only: bool = field_argument(
+            flag="--decode-only",
+            default=False,
+            action="store_true",
+            help="Decode encoded buffers from a reusable Linux tmpfs cache",
+        )
+        cache_dir: str = field_argument(
+            flag="--cache-dir",
+            default=None,
+            help="Private tmpfs cache directory (decode-only)",
+        )
+        cache_limit: str = field_argument(
+            flag="--cache-limit",
+            default=None,
+            help="Total encoded cache limit, default 2GiB",
+        )
 
     def benchmark(cfg: BenchmarkConfig) -> None:
         from pathlib import Path as StdLibPath
         import sys as _sys
 
         from .get_img_filenames import get_img_filenames
+
+        if not cfg.decode_only and (
+            cfg.cache_dir is not None or cfg.cache_limit is not None
+        ):
+            print(
+                "Error: --cache-dir/--cache-limit require --decode-only.",
+                file=_sys.stderr,
+            )
+            raise SystemExit(2)
+        if cfg.repeats <= 0 or cfg.num_samples < 0:
+            print(
+                "Error: repeats must be positive and num_samples nonnegative.",
+                file=_sys.stderr,
+            )
+            raise SystemExit(2)
 
         if not StdLibPath(cfg.img_path).exists():
             print(f"Error: Img dir '{cfg.img_path}' does not exist!", file=_sys.stderr)
@@ -304,14 +340,28 @@ def _build_cli() -> App:
 
         from .benchmark import BenchmarkImgRead, FileWarmupError
 
-        bench = BenchmarkImgRead(
-            filenames=filenames,
-            target_format=cfg.to,
-            num_repeats=cfg.repeats,
-            shuffle=cfg.shuffle,
-            warmup=not cfg.no_warmup,
+        decode_options = (
+            dict(
+                decode_only=True,
+                cache_dir=cfg.cache_dir,
+                cache_limit=2147483648 if cfg.cache_limit is None else cfg.cache_limit,
+            )
+            if cfg.decode_only
+            else {}
         )
-        if cfg.multiprocessing:
+        try:
+            bench = BenchmarkImgRead(
+                filenames=filenames,
+                target_format=cfg.to,
+                num_repeats=cfg.repeats,
+                shuffle=cfg.shuffle,
+                warmup=not cfg.no_warmup,
+                **decode_options,
+            )
+        except (ValueError, KeyError) as exc:
+            print(f"Error: {exc}", file=_sys.stderr)
+            raise SystemExit(2) from exc
+        if cfg.multiprocessing and not cfg.decode_only:
             compat_errors = _get_multiprocessing_compat_errors(
                 bench.func_dict,
                 cfg.img_lib,
@@ -359,7 +409,13 @@ def _build_cli() -> App:
         except FileWarmupError as exc:
             print(f"Error: {exc}", file=_sys.stderr)
             raise SystemExit(1) from exc
+        except ValueError as exc:
+            print(f"Error: {exc}", file=_sys.stderr)
+            raise SystemExit(2) from exc
         except (PermissionError, RuntimeError, OSError) as exc:
+            if cfg.decode_only:
+                print(f"Error: {exc}", file=_sys.stderr)
+                raise SystemExit(1) from exc
             if not cfg.multiprocessing:
                 raise
             _print_multiprocessing_start_error(exc)
