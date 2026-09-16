@@ -19,3 +19,14 @@ def read_img_pil(img_path: str) -> Image.Image:
 
 
 read_img_ndarray = read_img
+
+
+def decode_img(data):
+    return np.array(turbojpeg.decompress(bytes(data), pixelformat=turbojpeg.PF.RGB))
+
+
+decode_img_ndarray = decode_img
+
+
+def decode_img_pil(data):
+    return Image.fromarray(decode_img(data))

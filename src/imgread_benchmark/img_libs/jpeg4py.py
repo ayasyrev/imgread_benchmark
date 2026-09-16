@@ -26,3 +26,14 @@ def read_img_pil(img_path: str) -> Image.Image:
 
 # read_img returns numpy array
 read_img_ndarray = read_img
+
+
+def decode_img(data):
+    return jpeg4py.JPEG(np.frombuffer(data, dtype=np.uint8)).decode()
+
+
+decode_img_ndarray = decode_img
+
+
+def decode_img_pil(data):
+    return Image.fromarray(decode_img(data))

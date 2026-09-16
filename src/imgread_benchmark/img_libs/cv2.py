@@ -27,3 +27,17 @@ def read_img_pil(img_path: str) -> Image.Image:
 
 # cv2 read image as numpy array
 read_img_ndarray = read_img
+
+
+def decode_img(data):
+    image = cv2.imdecode(np.frombuffer(data, dtype=np.uint8), cv2.IMREAD_COLOR_RGB)
+    if image is None:
+        raise ValueError("cv2.imdecode returned None")
+    return image
+
+
+decode_img_ndarray = decode_img
+
+
+def decode_img_pil(data):
+    return Image.fromarray(decode_img(data))

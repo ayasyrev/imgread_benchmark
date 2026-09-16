@@ -23,3 +23,17 @@ def read_img_pil(img_path: str) -> Image.Image:
 def read_img(img_path: str) -> np.ndarray:
     """Default reader for imgread_rs backend."""
     return read_img_ndarray(img_path)
+
+
+if callable(getattr(_imgread_rs, "load_numpy_from_bytes", None)):
+
+    def decode_img(data):
+        result = _imgread_rs.load_numpy_from_bytes(bytes(data))
+        if result is None:
+            raise ValueError("imgread_rs returned None")
+        return np.asarray(result)
+
+    decode_img_ndarray = decode_img
+
+    def decode_img_pil(data):
+        return Image.fromarray(decode_img(data))

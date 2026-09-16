@@ -19,6 +19,20 @@ def read_img(img_path: str) -> Image.Image:
 read_img_pil = read_img
 
 
+def decode_img(data):
+    from io import BytesIO
+
+    with Image.open(BytesIO(data)) as image:
+        return image.convert("RGB")
+
+
+decode_img_pil = decode_img
+
+
+def decode_img_ndarray(data):
+    return np.asarray(decode_img(data))
+
+
 def read_img_ndarray(img_path: str) -> np.ndarray:
     """Reads image from path with PIL and returns numpy array with shape (width, height, channels).
 
