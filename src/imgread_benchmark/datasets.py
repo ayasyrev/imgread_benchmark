@@ -83,7 +83,7 @@ class DatasetProvider(abc.ABC):
 
         try:
             self.extract(archive_path)
-        finally: 
+        finally:
             archive_path.unlink(missing_ok=True)  # Remove archive after extraction
         sentinel.touch()
         console.print(

@@ -5,11 +5,14 @@ cov.xml
 Prj
 Data
 .data/
+.worktrees/
+/worktree/
+/scripts/
 conductor
 AGENTS.md
 GEMINI.md
 .gemini
-docs/
+/docs/
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
@@ -52,10 +55,10 @@ pip-delete-this-directory.txt
 # Unit test / coverage reports
 htmlcov/
 .tox/
-.nox/
 .coverage
 .coverage.*
 .cache
+.uv-cache/
 nosetests.xml
 coverage.xml
 *.cover
@@ -139,3 +142,6 @@ dmypy.json
 
 # Pyre type checker
 .pyre/
+
+# Local benchmark results
+/results/

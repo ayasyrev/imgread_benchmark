@@ -43,7 +43,9 @@ def test_plugin_adapter_loaded_and_callable(monkeypatch):
             return object()
         return real_find_spec(name)
 
-    monkeypatch.setattr(img_libs_pkgs, "entry_points", lambda **kwargs: [FakeEntryPoint()])
+    monkeypatch.setattr(
+        img_libs_pkgs, "entry_points", lambda **kwargs: [FakeEntryPoint()]
+    )
     monkeypatch.setattr(img_libs_pkgs, "find_spec", fake_find_spec)
     _clear_caches()
 
@@ -66,8 +68,11 @@ def test_plugin_version_unknown_when_distribution_missing(monkeypatch):
         def load(self):
             return types.SimpleNamespace(read_img=lambda _path: "ok")
 
-    monkeypatch.setattr(img_libs_pkgs, "entry_points", lambda **kwargs: [FakeEntryPoint()])
+    monkeypatch.setattr(
+        img_libs_pkgs, "entry_points", lambda **kwargs: [FakeEntryPoint()]
+    )
     monkeypatch.setattr(img_libs_pkgs, "find_spec", lambda _name: object())
+
     def _missing(_pkg):
         raise PackageNotFoundError
 

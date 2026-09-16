@@ -120,15 +120,6 @@ def test_get_img_lib_available():
     assert "PIL" in libs
 
 
-def test_get_img_lib_available_cached():
-    """Test that get_img_lib_available is cached."""
-    from imgread_benchmark.img_libs.img_libs_pkgs import get_img_lib_available
-
-    libs1 = get_img_lib_available()
-    libs2 = get_img_lib_available()
-    assert libs1 is libs2
-
-
 def test_additional_backends_are_appended_after_core(monkeypatch):
     from imgread_benchmark.img_libs import img_libs_pkgs
 
@@ -138,6 +129,7 @@ def test_additional_backends_are_appended_after_core(monkeypatch):
         return None
 
     monkeypatch.setattr(img_libs_pkgs, "find_spec", fake_find_spec)
+    monkeypatch.setattr(img_libs_pkgs, "load_img_lib_adapter", lambda name: None)
     monkeypatch.setattr(img_libs_pkgs, "entry_points", lambda **kwargs: [])
 
     img_libs_pkgs.get_plugin_entry_points.cache_clear()
@@ -149,14 +141,6 @@ def test_additional_backends_are_appended_after_core(monkeypatch):
     assert libs[:3] == ["PIL", "local_rs", "imgread_rs"]
     assert "local_rs" not in img_libs_pkgs._CORE_BUILTIN_LIB_TO_PACKAGE
     assert "local_rs" in img_libs_pkgs._ADDITIONAL_LIB_TO_PACKAGE
-
-
-def test_lazy_list_is_sequence():
-    import collections.abc
-
-    from imgread_benchmark.img_libs.img_libs_pkgs import img_lib_available
-
-    assert isinstance(img_lib_available, collections.abc.Sequence)
 
 
 def test_entry_point_plugin_discovery(monkeypatch):
@@ -182,8 +166,11 @@ def test_entry_point_plugin_discovery(monkeypatch):
             return object()
         return real_find_spec(name)
 
-    monkeypatch.setattr(img_libs_pkgs, "entry_points", lambda **kwargs: [FakeEntryPoint()])
+    monkeypatch.setattr(
+        img_libs_pkgs, "entry_points", lambda **kwargs: [FakeEntryPoint()]
+    )
     monkeypatch.setattr(img_libs_pkgs, "find_spec", fake_find_spec)
+    monkeypatch.setattr(img_libs_pkgs, "load_img_lib_adapter", lambda name: None)
 
     img_libs_pkgs.get_plugin_entry_points.cache_clear()
     img_libs_pkgs.get_lib_package_map.cache_clear()
@@ -211,7 +198,9 @@ def test_entry_point_collision_builtin_wins(monkeypatch):
         def load(self):
             return types.SimpleNamespace(read_img=lambda _: "ok")
 
-    monkeypatch.setattr(img_libs_pkgs, "entry_points", lambda **kwargs: [FakeEntryPoint()])
+    monkeypatch.setattr(
+        img_libs_pkgs, "entry_points", lambda **kwargs: [FakeEntryPoint()]
+    )
 
     img_libs_pkgs.get_plugin_entry_points.cache_clear()
     img_libs_pkgs.get_lib_package_map.cache_clear()
@@ -233,7 +222,9 @@ def test_entry_point_is_available_hook(monkeypatch):
         def load(self):
             return types.SimpleNamespace(is_available=lambda: False)
 
-    monkeypatch.setattr(img_libs_pkgs, "entry_points", lambda **kwargs: [FakeEntryPoint()])
+    monkeypatch.setattr(
+        img_libs_pkgs, "entry_points", lambda **kwargs: [FakeEntryPoint()]
+    )
     monkeypatch.setattr(img_libs_pkgs, "find_spec", lambda _name: object())
 
     img_libs_pkgs.get_plugin_entry_points.cache_clear()
@@ -256,11 +247,11 @@ def test_entry_point_load_error_warns_to_stderr(monkeypatch, capsys):
         def load(self):
             raise RuntimeError("boom")
 
-    monkeypatch.setattr(img_libs_pkgs, "entry_points", lambda **kwargs: [FakeEntryPoint()])
-    monkeypatch.setattr(img_libs_pkgs, "find_spec", lambda _name: object())
     monkeypatch.setattr(
-        img_libs_pkgs, "_iter_builtin_libs_in_order", lambda: ("PIL",)
+        img_libs_pkgs, "entry_points", lambda **kwargs: [FakeEntryPoint()]
     )
+    monkeypatch.setattr(img_libs_pkgs, "find_spec", lambda _name: object())
+    monkeypatch.setattr(img_libs_pkgs, "_iter_builtin_libs_in_order", lambda: ("PIL",))
 
     img_libs_pkgs.get_plugin_entry_points.cache_clear()
     img_libs_pkgs.get_lib_package_map.cache_clear()

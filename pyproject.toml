@@ -4,19 +4,16 @@ build-backend = "uv_build"
 
 [project]
 name = "imgread_benchmark"
-version = "0.3.1"
+version = "0.3.2"
 description = "benchmark for read images."
 readme = { file = "README.md", content-type = "text/markdown" }
 license = { text = "Apache-2.0" }
 authors = [{ name = "Yasyrev Andrei", email = "a.yasyrev@gmail.com" }]
-requires-python = ">=3.10"
+requires-python = ">=3.12,<3.14"
 classifiers = [
     "Programming Language :: Python :: 3",
-    "Programming Language :: Python :: 3.10",
-    "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
     "Programming Language :: Python :: 3.13",
-    "Programming Language :: Python :: 3.14",
     "License :: OSI Approved :: Apache Software License",
     "Operating System :: OS Independent",
 ]
@@ -36,6 +33,9 @@ Homepage = "https://github.com/ayasyrev/imgread_benchmark"
 imgread_benchmark = "imgread_benchmark.cli:main"
 
 [project.optional-dependencies]
+dataloader = ["torch==2.10.0", "torchvision==0.25.0", "opencv-python-headless==4.13.0.90"]
+monitor = ["psutil>=7.2,<8"]
+imgread = ["imgread>=0.2.1"]
 dev = [
     "black",
     "black[jupyter]",
@@ -44,7 +44,6 @@ dev = [
     "isort",
     "mypy",
     "nbmetaclean",
-    "nox",
     "pre-commit",
     "ruff",
     "torchvision",
@@ -54,12 +53,17 @@ test = [
     "pytest-cov",
 ]
 img_libs = [
+    "imgread>=0.2.1",
     "imageio",
     "jpeg4py",
     "kornia",
     "kornia_rs",
     "opencv-python-headless",
     "scikit-image",
+    "ajpegli",
+    "imagecodecs",
+    "simplejpeg",
+    "turbojpeg",
 ]
 
 [tool.imgread.conda-deps]
@@ -67,3 +71,10 @@ packages = [
     "accimage",
     "imread",
 ]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
+[tool.ruff.lint]
+# Preserve the rules used by the Ruff 0.14 pre-commit hook across releases.
+select = ["E4", "E7", "E9", "F"]

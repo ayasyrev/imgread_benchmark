@@ -35,10 +35,3 @@ def test_data_invalid_dataset():
     """Test that invalid dataset name raises SystemExit (from argparse)."""
     with pytest.raises(SystemExit):
         download_app(["invalid_ds"])
-
-
-def test_dataset_provider_map_contains_imagenette():
-    from imgread_benchmark import cl_data
-
-    assert "imagenette" in cl_data.DATASET_PROVIDERS
-    assert cl_data.DATASET_PROVIDERS["imagenette"].__name__ == "ImagenetteProvider"

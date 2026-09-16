@@ -3,7 +3,7 @@ import sys
 from argparsecfg.app import app
 from dataclasses import dataclass
 from .argparse_compat import field_argument
-from .benchmark import BenchmarkImgRead
+from .benchmark import BenchmarkImgRead, FileWarmupError
 from .get_img_filenames import get_img_filenames
 
 
@@ -41,6 +41,30 @@ class AppConfig:
         help="use multiprocessing, default=False",
     )
     nw: int = field_argument(default=None, help="num workers, if 0 -> use all cpus")
+    shuffle: bool = field_argument(
+        "--shuffle",
+        default=False,
+        action="store_true",
+        help="Shuffle files before every repeat of each image reader",
+    )
+    no_warmup: bool = field_argument(
+        flag="--no-warmup",
+        default=False,
+        action="store_true",
+        help="Skip reading all selected files before the first timed benchmark",
+    )
+    decode_only: bool = field_argument(
+        flag="--decode-only",
+        default=False,
+        action="store_true",
+        help="Decode buffers from a reusable Linux tmpfs cache",
+    )
+    cache_dir: str = field_argument(
+        flag="--cache-dir", default=None, help="Private tmpfs cache directory"
+    )
+    cache_limit: str = field_argument(
+        flag="--cache-limit", default=None, help="Encoded cache limit, default 2GiB"
+    )
 
 
 @app(
@@ -50,6 +74,13 @@ def benchmark(
     cfg: AppConfig,
 ) -> None:
     """Benchmark read image functions."""
+    if not cfg.decode_only and (
+        cfg.cache_dir is not None or cfg.cache_limit is not None
+    ):
+        print(
+            "Error: --cache-dir/--cache-limit require --decode-only.", file=sys.stderr
+        )
+        raise SystemExit(2)
     if not Path(cfg.img_path).exists():
         print(f"Img dir {cfg.img_path} dos not exist!")
         raise sys.exit()
@@ -67,16 +98,35 @@ def benchmark(
     else:
         print(f"{len(filenames)} images.")
 
-    bench = BenchmarkImgRead(
-        filenames=filenames,
-        target_format=cfg.to,
-    )
-    bench.run(
-        func_name=cfg.img_lib,
-        exclude=cfg.exclude,
-        multiprocessing=cfg.multiprocessing,
-        num_workers=cfg.nw,
-    )
+    try:
+        decode_options = (
+            dict(
+                decode_only=True,
+                cache_dir=cfg.cache_dir,
+                cache_limit=2147483648 if cfg.cache_limit is None else cfg.cache_limit,
+            )
+            if cfg.decode_only
+            else {}
+        )
+        bench = BenchmarkImgRead(
+            filenames=filenames,
+            target_format=cfg.to,
+            shuffle=cfg.shuffle,
+            warmup=not cfg.no_warmup,
+            **decode_options,
+        )
+        bench.run(
+            func_name=cfg.img_lib,
+            exclude=cfg.exclude,
+            multiprocessing=cfg.multiprocessing,
+            num_workers=cfg.nw,
+        )
+    except (FileWarmupError, RuntimeError, OSError) as exc:
+        print(f"Error: {exc}", file=sys.stderr)
+        raise SystemExit(1) from exc
+    except ValueError as exc:
+        print(f"Error: {exc}", file=sys.stderr)
+        raise SystemExit(2) from exc
 
 
 if __name__ == "__main__":  # pragma: no cover

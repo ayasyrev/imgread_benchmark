@@ -96,6 +96,21 @@ def get_read_img_ndarray() -> Dict[str, Callable[[str], ndarray]]:
     return get_func_dict("read_img_ndarray", get_img_libs())
 
 
+def get_decode_functions(target_format="def"):
+    """Strict buffer decoders: exceptions and None must reach the executor."""
+    names = {"def": "decode_img", "pil": "decode_img_pil", "np": "decode_img_ndarray"}
+    if target_format not in names:
+        raise ValueError(f"Unknown target format {target_format!r}")
+    functions, unavailable = {}, {}
+    for name, adapter in get_img_libs().items():
+        function = getattr(adapter, names[target_format], None)
+        if callable(function):
+            functions[name] = function
+        else:
+            unavailable[name] = f"no {target_format} buffer decoder"
+    return functions, unavailable
+
+
 @lru_cache(maxsize=1)
 def get_read_img_version() -> Dict[str, str]:
     """Get version dict for image libraries (lazy, cached)."""

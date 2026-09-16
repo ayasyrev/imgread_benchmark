@@ -5,7 +5,7 @@ from typing import Callable, Sequence, Union
 from argparsecfg.app import App
 from .argparse_compat import field_argument
 
-_KNOWN_COMMANDS = {"benchmark", "libs", "data"}
+_KNOWN_COMMANDS = {"benchmark", "libs", "data", "dataloader"}
 
 _BENCHMARK_FLAG_ALLOWLIST = {
     "-n",
@@ -21,11 +21,20 @@ _BENCHMARK_FLAG_ALLOWLIST = {
     "-m",
     "--multiprocessing",
     "--nw",
+    "-r",
+    "--repeats",
+    "--shuffle",
+    "--no-warmup",
+    "--decode-only",
+    "--cache-dir",
+    "--cache-limit",
 }
 
 _ROOT_ONLY_FLAGS = {"-h", "--help", "-V", "--version"}
 
 _FLAGS_WITH_VALUES = {
+    "--cache-dir",
+    "--cache-limit",
     "-n",
     "--num_samples",
     "-t",
@@ -35,6 +44,8 @@ _FLAGS_WITH_VALUES = {
     "-x",
     "--exclude",
     "--nw",
+    "-r",
+    "--repeats",
 }
 
 
@@ -126,9 +137,9 @@ def _get_multiprocessing_compat_errors(
 def _probe_multiprocessing_workers(num_workers: int | None) -> None:
     from multiprocessing import Pool, cpu_count
 
-    cpu_num = cpu_count() or 1  
-    workers = cpu_num if num_workers is None else num_workers  
-    if workers <= 0:  
+    cpu_num = cpu_count() or 1
+    workers = cpu_num if num_workers is None else num_workers
+    if workers <= 0:
         workers = cpu_num
     with Pool(workers) as pool:
         pool.map(int, [1])
@@ -257,12 +268,61 @@ def _build_cli() -> App:
             default=None,
             help="num workers, if 0 -> use all cpus",
         )
+        repeats: int = field_argument(
+            "-r",
+            "--repeats",
+            default=5,
+            help="Number of repeat runs, default 5",
+        )
+        shuffle: bool = field_argument(
+            "--shuffle",
+            default=False,
+            action="store_true",
+            help="Shuffle files before every repeat of each image reader",
+        )
+        no_warmup: bool = field_argument(
+            flag="--no-warmup",
+            default=False,
+            action="store_true",
+            help="Skip reading all selected files before the first timed benchmark",
+        )
+        decode_only: bool = field_argument(
+            flag="--decode-only",
+            default=False,
+            action="store_true",
+            help="Decode encoded buffers from a reusable Linux tmpfs cache",
+        )
+        cache_dir: str = field_argument(
+            flag="--cache-dir",
+            default=None,
+            help="Private tmpfs cache directory (decode-only)",
+        )
+        cache_limit: str = field_argument(
+            flag="--cache-limit",
+            default=None,
+            help="Total encoded cache limit, default 2GiB",
+        )
 
     def benchmark(cfg: BenchmarkConfig) -> None:
         from pathlib import Path as StdLibPath
         import sys as _sys
 
         from .get_img_filenames import get_img_filenames
+
+        if not cfg.decode_only and (
+            cfg.cache_dir is not None or cfg.cache_limit is not None
+        ):
+            print(
+                "Error: --cache-dir/--cache-limit require --decode-only.",
+                file=_sys.stderr,
+            )
+            raise SystemExit(2)
+        if cfg.repeats <= 0 or cfg.num_samples < 0:
+            print(
+                "Error: repeats must be positive and num_samples nonnegative.",
+                file=_sys.stderr,
+            )
+            raise SystemExit(2)
 
         if not StdLibPath(cfg.img_path).exists():
             print(f"Error: Img dir '{cfg.img_path}' does not exist!", file=_sys.stderr)
@@ -274,14 +334,34 @@ def _build_cli() -> App:
         if cfg.all:
             cfg.num_samples = 0
         filenames = get_img_filenames(cfg.img_path, num_samples=cfg.num_samples)
-        if not filenames:  
-            print(f"Error: No images found in '{cfg.img_path}'!", file=_sys.stderr)  
-            raise SystemExit(1) 
+        if not filenames:
+            print(f"Error: No images found in '{cfg.img_path}'!", file=_sys.stderr)
+            raise SystemExit(1)
 
-        from .benchmark import BenchmarkImgRead
+        from .benchmark import BenchmarkImgRead, FileWarmupError
 
-        bench = BenchmarkImgRead(filenames=filenames, target_format=cfg.to)
-        if cfg.multiprocessing:
+        decode_options = (
+            dict(
+                decode_only=True,
+                cache_dir=cfg.cache_dir,
+                cache_limit=2147483648 if cfg.cache_limit is None else cfg.cache_limit,
+            )
+            if cfg.decode_only
+            else {}
+        )
+        try:
+            bench = BenchmarkImgRead(
+                filenames=filenames,
+                target_format=cfg.to,
+                num_repeats=cfg.repeats,
+                shuffle=cfg.shuffle,
+                warmup=not cfg.no_warmup,
+                **decode_options,
+            )
+        except (ValueError, KeyError) as exc:
+            print(f"Error: {exc}", file=_sys.stderr)
+            raise SystemExit(2) from exc
+        if cfg.multiprocessing and not cfg.decode_only:
             compat_errors = _get_multiprocessing_compat_errors(
                 bench.func_dict,
                 cfg.img_lib,
@@ -326,13 +406,25 @@ def _build_cli() -> App:
                 multiprocessing=cfg.multiprocessing,
                 num_workers=num_workers,
             )
+        except FileWarmupError as exc:
+            print(f"Error: {exc}", file=_sys.stderr)
+            raise SystemExit(1) from exc
+        except ValueError as exc:
+            print(f"Error: {exc}", file=_sys.stderr)
+            raise SystemExit(2) from exc
         except (PermissionError, RuntimeError, OSError) as exc:
+            if cfg.decode_only:
+                print(f"Error: {exc}", file=_sys.stderr)
+                raise SystemExit(1) from exc
             if not cfg.multiprocessing:
                 raise
             _print_multiprocessing_start_error(exc)
             raise SystemExit(2) from exc
 
     cli.command(benchmark)
+    from .dataloader.cli import dataloader
+
+    cli.command(dataloader)
     return cli
 
 
