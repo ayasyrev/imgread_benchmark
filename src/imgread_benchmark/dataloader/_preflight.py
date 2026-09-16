@@ -31,7 +31,11 @@ def main():
                 from .resources import preflight_monitor
 
                 preflight_monitor()
-        except (ValueError, ImportError) as exc:
+        except ImportError as exc:
+            extra = "imgread" if getattr(exc, "name", "") == "imgread" else "dataloader"
+            emit("configuration_error", reason=f"{exc}; install the {extra} extra")
+            return 0
+        except ValueError as exc:
             emit("configuration_error", reason=str(exc))
             return 0
         emit("phase", stage="preflight.manifest")
